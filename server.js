@@ -14,51 +14,78 @@ app.get("/", (req,res)=>{
   res.json({status:"backend running"})
 })
 
-app.post("/update-contact", async (req,res)=>{
 
-  try{
+app.post("/update-contact", async (req, res) => {
+  try {
 
-    const { contactId, companyName, firstName, lastName, service } = req.body
+    const { contactId, companyName, firstName, lastName, email, service } = req.body;
 
-    const response = await fetch(
-      `https://services.leadconnectorhq.com/contacts/${contactId}`,
-      {
-        method:"PUT",
-        headers:{
-          Authorization:`Bearer ${process.env.GHL_API_KEY}`,
-          "Content-Type":"application/json",
-          Version:"2021-07-28"
-        },
-        body: JSON.stringify({
-  		companyName,
-  		firstName,
-  		lastName,
-  		customFields: [
-    			{
-      			id: "ZupChSuIotB55kMGxZiD",
-      			field_value: service
-    			}
-  		]
-	})
-      }
-    )
+    // 🔥 REQUIRE EMAIL
+    if (!email) {
+      return res.status(400).json({
+        error: "Email is required"
+      });
+    }
 
-    const data = await response.json()
+    let url;
+    let method;
+
+    if (contactId) {
+      // ✅ UPDATE existing contact
+      url = `https://services.leadconnectorhq.com/contacts/${contactId}`;
+      method = "PUT";
+      console.log("Updating contact:", contactId);
+    } else {
+      // ✅ CREATE new contact
+      url = `https://services.leadconnectorhq.com/contacts/`;
+      method = "POST";
+      console.log("Creating new contact");
+    }
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+        "Content-Type": "application/json",
+        Version: "2021-07-28"
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        email,            // ✅ REQUIRED
+        companyName,
+        customFields: [
+          {
+            id: "ZupChSuIotB55kMGxZiD", // ✅ correct usage (ID, not key)
+            field_value: service
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+
+    console.log("GHL RESPONSE:", data);
+
+    if (!data.contact || !data.contact.id) {
+      return res.status(500).json({
+        error: "Failed to create/update contact",
+        ghl: data
+      });
+    }
 
     res.json({
-      success:true,
-      ghl:data
-    })
+      success: true,
+      contactId: data.contact.id
+    });
 
-  }catch(error){
-
+  } catch (error) {
     res.status(500).json({
-      error:error.message
-    })
-
+      error: error.message
+    });
   }
+});
 
-})
 
 app.listen(PORT, ()=>{
   console.log(`Server running on port ${PORT}`)
