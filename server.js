@@ -147,6 +147,11 @@ app.post("/create-contact", async (req, res) => {
       ]
     };
 
+    // 🔥 ONLY include locationId for CREATE
+    if (method === "POST") {
+        body.locationId = process.env.GHL_LOCATION_ID;
+    }
+
     console.log("📡 Sending to GHL:", body);
 
     /* =========================
