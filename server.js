@@ -1,4 +1,5 @@
-const express = require("express")
+
+express = require("express")
 const cors = require("cors")
 const fetch = require("node-fetch")
 require("dotenv").config()
@@ -8,39 +9,149 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-const PORT = process.env.PORT
+const PORT = process.env.PORT || 3000;
+
+
+/* =========================
+   HELPERS
+========================= */
+
+// 🔥 Normalize phone to E.164 (+1XXXXXXXXXX)
+function normalizePhone(phone) {
+  if (!phone) return null;
+
+  let digits = phone.replace(/\D/g, "");
+
+  // Assume US if 10 digits
+  if (digits.length === 10) {
+    digits = "1" + digits;
+  }
+
+  if (!digits.startsWith("1")) {
+    return "+" + digits;
+  }
+
+  return "+" + digits;
+}
+
+
+/* =========================
+   HEALTH CHECK
+========================= */
 
 app.get("/", (req,res)=>{
   res.json({status:"backend running"})
 })
 
+/* =========================
+   CREATE / UPDATE CONTACT (SMART + URL CONTACTID)
+========================= */
 
-app.post("/update-contact", async (req, res) => {
+app.post("/create-contact", async (req, res) => {
   try {
 
-    const { contactId, companyName, firstName, lastName, email, service } = req.body;
+    let {
+      contactId,
+      companyName,
+      firstName,
+      lastName,
+      email,
+      phone,
+      service
+    } = req.body;
 
-    // 🔥 REQUIRE EMAIL
-    if (!email) {
+    console.log("📥 Incoming:", req.body);
+
+    // 🔥 Normalize phone
+    phone = normalizePhone(phone);
+
+    // 🔥 Require at least one identifier
+    if (!email && !phone && !contactId) {
       return res.status(400).json({
-        error: "Email is required"
+        error: "Email, phone, or contactId is required"
       });
     }
+
+    let idToUse = contactId || null;
+
+    /* =========================
+       STEP 1: SEARCH (if no contactId)
+    ========================= */
+
+    if (!idToUse) {
+      try {
+        let searchUrl = null;
+
+        if (phone) {
+          searchUrl = `https://services.leadconnectorhq.com/contacts/search?phone=${encodeURIComponent(phone)}`;
+        } else if (email) {
+          searchUrl = `https://services.leadconnectorhq.com/contacts/search?email=${encodeURIComponent(email)}`;
+        }
+
+        if (searchUrl) {
+          const searchRes = await fetch(searchUrl, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+              Version: "2021-07-28"
+            }
+          });
+
+          const searchData = await searchRes.json();
+
+          if (searchData.contacts && searchData.contacts.length > 0) {
+            idToUse = searchData.contacts[0].id;
+            console.log("🔁 Found existing contact:", idToUse);
+          }
+        }
+
+      } catch (err) {
+        console.warn("⚠️ Search failed, continuing:", err.message);
+      }
+    }
+
+    /* =========================
+       STEP 2: DETERMINE METHOD
+    ========================= */
 
     let url;
     let method;
 
-    if (contactId) {
-      // ✅ UPDATE existing contact
-      url = `https://services.leadconnectorhq.com/contacts/${contactId}`;
+    if (idToUse) {
+      url = `https://services.leadconnectorhq.com/contacts/${idToUse}`;
       method = "PUT";
-      console.log("Updating contact:", contactId);
+      console.log("🔁 Updating contact:", idToUse);
     } else {
-      // ✅ CREATE new contact
       url = `https://services.leadconnectorhq.com/contacts/`;
       method = "POST";
-      console.log("Creating new contact");
+      console.log("🆕 Creating new contact");
     }
+
+
+/* =========================
+       STEP 3: BUILD BODY
+    ========================= */
+
+    const body = {
+      locationId: process.env.GHL_LOCATION_ID,
+      firstName,
+      lastName,
+      email: email || undefined,
+      phone: phone || undefined,
+      companyName,
+      customFields: [
+        {
+          id: "ZupChSuIotB55kMGxZiD", // 🔥 your service field ID
+          field_value: service || ""
+        }
+      ]
+    };
+
+    console.log("📡 Sending to GHL:", body);
+
+    /* =========================
+       STEP 4: SEND TO GHL
+    ========================= */
 
     const response = await fetch(url, {
       method,
@@ -49,44 +160,65 @@ app.post("/update-contact", async (req, res) => {
         "Content-Type": "application/json",
         Version: "2021-07-28"
       },
-      body: JSON.stringify({
-        firstName,
-        lastName,
-        email,            // ✅ REQUIRED
-        companyName,
-        customFields: [
-          {
-            id: "ZupChSuIotB55kMGxZiD", // ✅ correct usage (ID, not key)
-            field_value: service
-          }
-        ]
-      })
+      body: JSON.stringify(body)
     });
 
     const data = await response.json();
 
-    console.log("GHL RESPONSE:", data);
+    console.log("📡 GHL Response:", data);
 
-    if (!data.contact || !data.contact.id) {
-      return res.status(500).json({
-        error: "Failed to create/update contact",
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: "GHL error",
         ghl: data
       });
     }
 
+    /* =========================
+       STEP 5: EXTRACT CONTACT ID
+    ========================= */
+
+    const finalContactId =
+      data.contact?.id ||
+      data.id ||
+      idToUse;
+
+    if (!finalContactId) {
+      return res.status(500).json({
+        error: "No contactId returned",
+        ghl: data
+      });
+    }
+
+    console.log("✅ Final contactId:", finalContactId);
+
+    /* =========================
+       SUCCESS RESPONSE
+    ========================= */
+
     res.json({
       success: true,
-      contactId: data.contact.id
+      contactId: finalContactId,
+      companyName,
+      phone,
+      email
     });
 
   } catch (error) {
+    console.error("❌ Server Error:", error);
+
     res.status(500).json({
-      error: error.message
+      error: "Server crashed",
+      details: error.message
     });
   }
 });
 
+/* =========================
+   START SERVER
+========================= */
 
-app.listen(PORT, ()=>{
-  console.log(`Server running on port ${PORT}`)
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 })
