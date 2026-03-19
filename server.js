@@ -132,27 +132,43 @@ app.post("/create-contact", async (req, res) => {
        STEP 3: BUILD BODY
     ========================= */
 
-    const body = {
-      locationId: process.env.GHL_LOCATION_ID,
-      firstName,
-      lastName,
-      email: email || undefined,
-      phone: phone || undefined,
-      companyName,
-      customFields: [
-        {
-          id: "ZupChSuIotB55kMGxZiD", // 🔥 your service field ID
-          field_value: service || ""
-        }
-      ]
-    };
+    let body;
 
-    // 🔥 ONLY include locationId for CREATE
     if (method === "POST") {
-        body.locationId = process.env.GHL_LOCATION_ID;
+      // ✅ CREATE (include locationId)
+      body = {
+        locationId: process.env.GHL_LOCATION_ID,
+        firstName,
+        lastName,
+        email: email || undefined,
+        phone: phone || undefined,
+        companyName,
+        customFields: [
+          {
+            id: "ZupChSuIotB55kMGxZiD",
+            field_value: service || ""
+          }
+        ]
+      };
+    } else {
+      // ✅ UPDATE (NO locationId)
+      body = {
+        firstName,
+        lastName,
+        email: email || undefined,
+        phone: phone || undefined,
+        companyName,
+        customFields: [
+          {
+            id: "ZupChSuIotB55kMGxZiD",
+            field_value: service || ""
+          }
+        ]
+      };
     }
 
-    console.log("📡 Sending to GHL:", body);
+    console.log("📡 METHOD:", method);
+    console.log("📡 BODY:", body);
 
     /* =========================
        STEP 4: SEND TO GHL
