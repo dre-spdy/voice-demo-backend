@@ -19,11 +19,8 @@ console.log("API KEY LOADED:", process.env.GHL_API_KEY ? "YES" : "NO");
 // Optional (very helpful)
 console.log("API KEY LENGTH:", process.env.GHL_API_KEY?.length);
 
-<<<<<<< HEAD
-=======
 console.log("LOCATION ID:", GHL_LOCATION_ID);
 
->>>>>>> fix header
 const PORT = process.env.PORT || 3000;
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
