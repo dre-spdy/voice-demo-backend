@@ -3,46 +3,30 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// Node 18+ has global fetch.
-// If your Render service is older Node, uncomment the next line:
-// const fetch = require("node-fetch");
-
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-
-// ✅ ADD IT RIGHT HERE
-console.log("API KEY LOADED:", process.env.GHL_API_KEY ? "YES" : "NO");
-
-// Optional (very helpful)
-console.log("API KEY LENGTH:", process.env.GHL_API_KEY?.length);
-
+// ===============================
+// ENV
+// ===============================
 const PORT = process.env.PORT || 3000;
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
-const GHL_VERSION = "2021-07-28";
 
-// Optional if your token requires location scoping
-const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || "";
+console.log("API KEY LOADED:", GHL_API_KEY ? "YES" : "NO");
 
-if (!GHL_API_KEY) {
-  console.warn("⚠️ Missing GHL_API_KEY in environment variables.");
-}
-
-console.log("LOCATION ID:", GHL_LOCATION_ID);
-
-// -----------------------------------
+// ===============================
 // BASIC ROUTE
-// -----------------------------------
+// ===============================
 app.get("/", (req, res) => {
   res.json({ status: "backend running" });
 });
 
-// -----------------------------------
-// MAIN BOOTSTRAP ROUTE
-// -----------------------------------
+// ===============================
+// MAIN BOOTSTRAP (NO SEARCH)
+// ===============================
 app.post("/bootstrap-demo", async (req, res) => {
   try {
     const {
@@ -59,28 +43,10 @@ app.post("/bootstrap-demo", async (req, res) => {
 
     let contactId = existingContactId || null;
 
-    // 1) Primary lookup by phone
-    if (!contactId && phone) {
-      console.log("🔍 Searching by phone:", phone);
-      contactId = await findContactByPhone(phone);
-    }
-
-    // 2) Secondary lookup by email
-    if (!contactId && email) {
-      console.log("🔍 Searching by email:", email);
-      contactId = await findContactByEmail(email);
-    }
-
-    // 3) Fallback by sessionId
-    if (!contactId && sessionId) {
-      console.log("🔍 Searching by sessionId:", sessionId);
-      contactId = await findContactBySessionId(sessionId);
-    }
-
-    // 4) Create or update
+    // 🔥 NO SEARCH — CREATE OR UPDATE ONLY
     if (!contactId) {
-      console.log("🆕 No contact found. Creating new contact...");
-      contactId = await createDemoContact({
+      console.log("🆕 Creating new contact...");
+      contactId = await createContact({
         firstName,
         email,
         phone,
@@ -91,8 +57,8 @@ app.post("/bootstrap-demo", async (req, res) => {
         sessionId
       });
     } else {
-      console.log("🔁 Existing contact found. Updating:", contactId);
-      await updateDemoContact(contactId, {
+      console.log("🔁 Updating contact:", contactId);
+      await updateContact(contactId, {
         firstName,
         email,
         phone,
@@ -104,11 +70,11 @@ app.post("/bootstrap-demo", async (req, res) => {
       });
     }
 
-    // 5) Add summary + previewUrl
+    // 🔥 ADD SUMMARY + PREVIEW
     const previewUrl = buildPreviewUrl(website);
-    const summary = buildDemoSummary({ company, service, website, city });
+    const summary = buildSummary({ company, service, website, city });
 
-    await updateDemoContact(contactId, {
+    await updateContact(contactId, {
       summary,
       previewUrl
     });
@@ -120,19 +86,24 @@ app.post("/bootstrap-demo", async (req, res) => {
       previewUrl,
       summary
     });
+
   } catch (error) {
-    console.error("❌ /bootstrap-demo error:", error);
+    console.error("❌ ERROR:", error);
     res.status(500).json({
       ok: false,
-      error: error.message || "Failed to bootstrap demo"
+      error: error.message
     });
   }
 });
 
-// -----------------------------------
-// GHL HELPERS
-// -----------------------------------
+// ===============================
+// HEADERS (PRIVATE INTEGRATION SAFE)
+// ===============================
 function ghlHeaders(extra = {}) {
+  if (!GHL_API_KEY) {
+    throw new Error("Missing GHL_API_KEY");
+  }
+
   return {
     Authorization: `Bearer ${GHL_API_KEY}`,
     Version: "2021-07-28",
@@ -142,210 +113,103 @@ function ghlHeaders(extra = {}) {
   };
 }
 
-function normalizePhoneForCompare(phone) {
-  return (phone || "").replace(/\D/g, "");
-}
+// ===============================
+// CREATE CONTACT
+// ===============================
+async function createContact(data) {
 
-async function ghlSearchContacts(query) {
-  const url = `${GHL_API_BASE}/contacts/?query=${encodeURIComponent(query)}`
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: ghlHeaders()
-  });
-
-  const data = await safeJson(response);
-
-  if (!response.ok) {
-    console.error("GHL search failed:", data);
-    throw new Error(`GHL search failed with status ${response.status}`);
-  }
-
-  return data;
-}
-
-async function findContactByPhone(phone) {
-  const data = await ghlSearchContacts(phone);
-  const target = normalizePhoneForCompare(phone);
-
-  const contact = (data.contacts || []).find((c) => {
-    const cPhone = normalizePhoneForCompare(c.phone || "");
-    return cPhone && (cPhone === target || cPhone.endsWith(target.slice(-10)));
-  });
-
-  return contact ? contact.id : null;
-}
-
-async function findContactByEmail(email) {
-  const data = await ghlSearchContacts(email);
-  const target = (email || "").trim().toLowerCase();
-
-  const contact = (data.contacts || []).find((c) => {
-    const cEmail = (c.email || "").trim().toLowerCase();
-    return cEmail && cEmail === target;
-  });
-
-  return contact ? contact.id : null;
-}
-
-async function findContactBySessionId(sessionId) {
-  const data = await ghlSearchContacts(sessionId);
-
-  const contact = (data.contacts || []).find((c) => {
-    const customFields = c.customFields || c.custom_fields || [];
-    return customFields.some((field) => {
-      const fieldValue = field.value ?? field.field_value ?? "";
-      const fieldKey = field.key ?? field.name ?? "";
-      return fieldValue === sessionId || fieldKey === "sr_session_id";
-    }) && customFields.some((field) => {
-      const fieldValue = field.value ?? field.field_value ?? "";
-      return fieldValue === sessionId;
-    });
-  });
-
-  return contact ? contact.id : null;
-}
-
-async function createDemoContact({
-  firstName,
-  email,
-  phone,
-  company,
-  service,
-  website,
-  city,
-  sessionId
-}) {
   const payload = {
-    firstName: firstName || "Guest",
+    firstName: data.firstName || "Guest",
     lastName: "Visitor",
-    ...(phone ? { phone } : {}),
-    ...(email ? { email } : {}),
-    ...(company ? { companyName: company } : {}),
+    phone: data.phone,
+    email: data.email,
+    companyName: data.company,
     customFields: [
-      { key: "sr_session_id", field_value: sessionId || "" },
-      { key: "sr_company", field_value: company || "" },
-      { key: "sr_service", field_value: service || "" },
-      { key: "sr_website", field_value: website || "" },
-      { key: "sr_city", field_value: city || "" }
+      { key: "sr_session_id", field_value: data.sessionId },
+      { key: "sr_company", field_value: data.company },
+      { key: "sr_service", field_value: data.service },
+      { key: "sr_website", field_value: data.website },
+      { key: "sr_city", field_value: data.city }
     ]
   };
 
-  const response = await fetch(`${GHL_API_BASE}/contacts/`, {
+  const res = await fetch(`${GHL_API_BASE}/contacts/`, {
     method: "POST",
-    headers: ghlHeaders({
-      "Content-Type": "application/json"
-    }),
+    headers: ghlHeaders(),
     body: JSON.stringify(payload)
   });
 
-  const data = await safeJson(response);
+  const json = await res.json();
 
-  if (!response.ok) {
-    console.error("Create contact failed:", data);
-    throw new Error(`Failed to create contact: ${response.status}`);
+  if (!res.ok) {
+    console.error("❌ CREATE ERROR:", json);
+    throw new Error("Create failed");
   }
 
-  const contactId = data.contact?.id || data.id;
-  if (!contactId) {
-    throw new Error("Create contact succeeded but no contact id returned.");
-  }
-
-  return contactId;
+  return json.contact?.id || json.id;
 }
 
-async function updateDemoContact(contactId, fields) {
+// ===============================
+// UPDATE CONTACT
+// ===============================
+async function updateContact(contactId, data) {
+
   const customFields = [];
 
-  if (fields.sessionId) {
-    customFields.push({ key: "sr_session_id", field_value: fields.sessionId });
-  }
-  if (fields.company) {
-    customFields.push({ key: "sr_company", field_value: fields.company });
-  }
-  if (fields.service) {
-    customFields.push({ key: "sr_service", field_value: fields.service });
-  }
-  if (fields.website) {
-    customFields.push({ key: "sr_website", field_value: fields.website });
-  }
-  if (fields.city) {
-    customFields.push({ key: "sr_city", field_value: fields.city });
-  }
-  if (fields.summary) {
-    customFields.push({ key: "sr_demo_summary", field_value: fields.summary });
-  }
-  if (fields.previewUrl) {
-    customFields.push({ key: "sr_preview_url", field_value: fields.previewUrl });
-  }
+  if (data.sessionId) customFields.push({ key: "sr_session_id", field_value: data.sessionId });
+  if (data.company) customFields.push({ key: "sr_company", field_value: data.company });
+  if (data.service) customFields.push({ key: "sr_service", field_value: data.service });
+  if (data.website) customFields.push({ key: "sr_website", field_value: data.website });
+  if (data.city) customFields.push({ key: "sr_city", field_value: data.city });
+  if (data.summary) customFields.push({ key: "sr_demo_summary", field_value: data.summary });
+  if (data.previewUrl) customFields.push({ key: "sr_preview_url", field_value: data.previewUrl });
 
   const payload = {
-    ...(fields.firstName ? { firstName: fields.firstName } : {}),
-    ...(fields.email ? { email: fields.email } : {}),
-    ...(fields.phone ? { phone: fields.phone } : {}),
-    ...(fields.company ? { companyName: fields.company } : {}),
-    ...(customFields.length ? { customFields } : {})
+    firstName: data.firstName,
+    email: data.email,
+    phone: data.phone,
+    companyName: data.company,
+    customFields
   };
 
-  const response = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
+  const res = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
     method: "PUT",
-    headers: ghlHeaders({
-      "Content-Type": "application/json"
-    }),
+    headers: ghlHeaders(),
     body: JSON.stringify(payload)
   });
 
-  const data = await safeJson(response);
+  const json = await res.json();
 
-  if (!response.ok) {
-    console.error("Update contact failed:", data);
-    throw new Error(`Failed to update contact ${contactId}: ${response.status}`);
+  if (!res.ok) {
+    console.error("❌ UPDATE ERROR:", json);
+    throw new Error("Update failed");
   }
 
-  return data;
+  return json;
 }
 
-// -----------------------------------
-// DEMO HELPERS
-// -----------------------------------
-function buildPreviewUrl(website) {
-  if (!website) return "";
+// ===============================
+// HELPERS
+// ===============================
+function buildPreviewUrl(site) {
+  if (!site) return "";
 
-  const target = website.startsWith("http://") || website.startsWith("https://")
-    ? website
-    : `https://${website}`;
+  const url = site.startsWith("http") ? site : `https://${site}`;
 
-  return `https://api.microlink.io/?url=${encodeURIComponent(target)}&screenshot=true&fullPage=true&viewport.width=390&viewport.height=844&viewport.deviceScaleFactor=1&meta=false&embed=screenshot.url&isMobile=true`;
+  return `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&isMobile=true`;
 }
 
-function buildDemoSummary({ company, service, website, city }) {
-  const parts = [];
-
-  if (company) parts.push(`Business name: ${company}.`);
-  if (service) parts.push(`Primary service: ${service}.`);
-  if (website) parts.push(`Website: ${website}.`);
-  if (city) parts.push(`Likely city or service area: ${city}.`);
-
-  parts.push("This is a live demo lead.");
-  parts.push("Speak naturally, warmly, and confidently.");
-  parts.push("Reference the business name and service when helpful.");
-  parts.push("Do not invent website details that were not explicitly provided.");
-
-  return parts.join(" ");
+function buildSummary({ company, service, website, city }) {
+  return `
+Business: ${company}
+Service: ${service}
+Website: ${website}
+City: ${city}
+Live demo lead. Speak naturally.
+`.trim();
 }
 
-async function safeJson(response) {
-  const text = await response.text();
-  try {
-    return text ? JSON.parse(text) : {};
-  } catch {
-    return { raw: text };
-  }
-}
-
-// -----------------------------------
-// START SERVER
-// -----------------------------------
+// ===============================
 app.listen(PORT, () => {
-  console.log(`✅ Server listening on port ${PORT}`);
+  console.log(`✅ Server running on ${PORT}`);
 });
