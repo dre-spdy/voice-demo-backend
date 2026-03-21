@@ -119,19 +119,20 @@ function ghlHeaders(extra = {}) {
 async function createContact(data) {
 
   const payload = {
+  locationId: process.env.GHL_LOCATION_ID, // 🔥 REQUIRED
+
   firstName: data.firstName || "Guest",
   lastName: data.lastName || "Visitor",
   phone: data.phone,
   email: data.email,
-  companyName: data.company, // maps to contact.company_name
+  companyName: data.company,
 
   customFields: [
     	{ key: "business_service", field_value: data.service },
     	{ key: "business_url", field_value: data.website },
-    	{ key: "city", field_value: data.city }, // only if custom
     	{ key: "sr_session_id", field_value: data.sessionId }
   	]
-	};
+  };
 
   const res = await fetch(`${GHL_API_BASE}/contacts/`, {
     method: "POST",
@@ -175,11 +176,13 @@ async function updateContact(contactId, data) {
   customFields.push({ key: "sr_preview_url", field_value: data.previewUrl });
 
   const payload = {
-    firstName: data.firstName,
-    email: data.email,
-    phone: data.phone,
-    companyName: data.company,
-    customFields
+  	locationId: process.env.GHL_LOCATION_ID, // 🔥 REQUIRED
+
+  	firstName: data.firstName,
+  	email: data.email,
+  	phone: data.phone,
+  	companyName: data.company,
+  	customFields
   };
 
   const res = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
