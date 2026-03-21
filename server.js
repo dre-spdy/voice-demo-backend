@@ -138,16 +138,11 @@ function ghlHeaders(extra = {}) {
     throw new Error("❌ Missing GHL_API_KEY");
   }
 
-  if (!GHL_LOCATION_ID) {
-    throw new Error("❌ Missing GHL_LOCATION_ID");
-  }
-
   return {
     Authorization: `Bearer ${GHL_API_KEY}`,
     Version: "2021-07-28",
     Accept: "application/json",
     "Content-Type": "application/json",
-    "Location-Id": GHL_LOCATION_ID, // 🔥 ALWAYS INCLUDED
     ...extra
   };
 }
