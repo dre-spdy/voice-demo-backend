@@ -18,6 +18,11 @@ console.log("API KEY LOADED:", process.env.GHL_API_KEY ? "YES" : "NO");
 // Optional (very helpful)
 console.log("API KEY LENGTH:", process.env.GHL_API_KEY?.length);
 
+<<<<<<< HEAD
+=======
+console.log("LOCATION ID:", GHL_LOCATION_ID);
+
+>>>>>>> fix header
 const PORT = process.env.PORT || 3000;
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
@@ -130,19 +135,23 @@ app.post("/bootstrap-demo", async (req, res) => {
 // GHL HELPERS
 // -----------------------------------
 function ghlHeaders(extra = {}) {
-  const headers = {
-    Authorization: `Bearer ${GHL_API_KEY}`,
-    Version: GHL_VERSION,
-    Accept: "application/json",
-    ...extra
-  };
 
-  // Some accounts/tokens may require location header.
-  if (GHL_LOCATION_ID) {
-    headers["Location-Id"] = GHL_LOCATION_ID;
+  if (!GHL_API_KEY) {
+    throw new Error("❌ Missing GHL_API_KEY");
   }
 
-  return headers;
+  if (!GHL_LOCATION_ID) {
+    throw new Error("❌ Missing GHL_LOCATION_ID");
+  }
+
+  return {
+    Authorization: `Bearer ${GHL_API_KEY}`,
+    Version: "2021-07-28",
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "Location-Id": GHL_LOCATION_ID, // 🔥 ALWAYS INCLUDED
+    ...extra
+  };
 }
 
 function normalizePhoneForCompare(phone) {
