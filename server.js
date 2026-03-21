@@ -157,7 +157,7 @@ function normalizePhoneForCompare(phone) {
 }
 
 async function ghlSearchContacts(query) {
-  const url = `${GHL_API_BASE}/contacts/search?query=${encodeURIComponent(query)}`;
+  const url = `${GHL_API_BASE}/contacts/?query=${encodeURIComponent(query)}`
 
   const response = await fetch(url, {
     method: "GET",
