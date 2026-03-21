@@ -1,244 +1,348 @@
 
-express = require("express")
-const cors = require("cors")
-const fetch = require("node-fetch")
-require("dotenv").config()
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
 
-const app = express()
+// Node 18+ has global fetch.
+// If your Render service is older Node, uncomment the next line:
+// const fetch = require("node-fetch");
 
-app.use(cors())
-app.use(express.json())
+const app = express();
+
+app.use(cors());
+app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
+const GHL_API_KEY = process.env.GHL_API_KEY;
+const GHL_API_BASE = "https://services.leadconnectorhq.com";
+const GHL_VERSION = "2021-07-28";
 
+// Optional if your token requires location scoping
+const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || "";
 
-/* =========================
-   HELPERS
-========================= */
-
-// 🔥 Normalize phone to E.164 (+1XXXXXXXXXX)
-function normalizePhone(phone) {
-  if (!phone) return null;
-
-  let digits = phone.replace(/\D/g, "");
-
-  // Assume US if 10 digits
-  if (digits.length === 10) {
-    digits = "1" + digits;
-  }
-
-  if (!digits.startsWith("1")) {
-    return "+" + digits;
-  }
-
-  return "+" + digits;
+if (!GHL_API_KEY) {
+  console.warn("⚠️ Missing GHL_API_KEY in environment variables.");
 }
 
+// -----------------------------------
+// BASIC ROUTE
+// -----------------------------------
+app.get("/", (req, res) => {
+  res.json({ status: "backend running" });
+});
 
-/* =========================
-   HEALTH CHECK
-========================= */
-
-app.get("/", (req,res)=>{
-  res.json({status:"backend running"})
-})
-
-/* =========================
-   CREATE / UPDATE CONTACT (SMART + URL CONTACTID)
-========================= */
-
-app.post("/create-contact", async (req, res) => {
+// -----------------------------------
+// MAIN BOOTSTRAP ROUTE
+// -----------------------------------
+app.post("/bootstrap-demo", async (req, res) => {
   try {
-
-    let {
-      contactId,
-      companyName,
+    const {
+      sessionId,
+      existingContactId,
+      company,
+      service,
+      website,
       firstName,
-      lastName,
       email,
       phone,
-      service
-    } = req.body;
+      city
+    } = req.body || {};
 
-    console.log("📥 Incoming:", req.body);
+    let contactId = existingContactId || null;
 
-    // 🔥 Normalize phone
-    phone = normalizePhone(phone);
+    // 1) Primary lookup by phone
+    if (!contactId && phone) {
+      console.log("🔍 Searching by phone:", phone);
+      contactId = await findContactByPhone(phone);
+    }
 
-    // 🔥 Require at least one identifier
-    if (!email && !phone && !contactId) {
-      return res.status(400).json({
-        error: "Email, phone, or contactId is required"
+    // 2) Secondary lookup by email
+    if (!contactId && email) {
+      console.log("🔍 Searching by email:", email);
+      contactId = await findContactByEmail(email);
+    }
+
+    // 3) Fallback by sessionId
+    if (!contactId && sessionId) {
+      console.log("🔍 Searching by sessionId:", sessionId);
+      contactId = await findContactBySessionId(sessionId);
+    }
+
+    // 4) Create or update
+    if (!contactId) {
+      console.log("🆕 No contact found. Creating new contact...");
+      contactId = await createDemoContact({
+        firstName,
+        email,
+        phone,
+        company,
+        service,
+        website,
+        city,
+        sessionId
+      });
+    } else {
+      console.log("🔁 Existing contact found. Updating:", contactId);
+      await updateDemoContact(contactId, {
+        firstName,
+        email,
+        phone,
+        company,
+        service,
+        website,
+        city,
+        sessionId
       });
     }
 
-    let idToUse = contactId || null;
+    // 5) Add summary + previewUrl
+    const previewUrl = buildPreviewUrl(website);
+    const summary = buildDemoSummary({ company, service, website, city });
 
-    /* =========================
-       STEP 1: SEARCH (if no contactId)
-    ========================= */
-
-    if (!idToUse) {
-      try {
-        let searchUrl = null;
-
-        if (phone) {
-          searchUrl = `https://services.leadconnectorhq.com/contacts/search?phone=${encodeURIComponent(phone)}`;
-        } else if (email) {
-          searchUrl = `https://services.leadconnectorhq.com/contacts/search?email=${encodeURIComponent(email)}`;
-        }
-
-        if (searchUrl) {
-          const searchRes = await fetch(searchUrl, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${process.env.GHL_API_KEY}`,
-              Version: "2021-07-28"
-            }
-          });
-
-          const searchData = await searchRes.json();
-
-          if (searchData.contacts && searchData.contacts.length > 0) {
-            idToUse = searchData.contacts[0].id;
-            console.log("🔁 Found existing contact:", idToUse);
-          }
-        }
-
-      } catch (err) {
-        console.warn("⚠️ Search failed, continuing:", err.message);
-      }
-    }
-
-    /* =========================
-       STEP 2: DETERMINE METHOD
-    ========================= */
-
-    let url;
-    let method;
-
-    if (idToUse) {
-      url = `https://services.leadconnectorhq.com/contacts/${idToUse}`;
-      method = "PUT";
-      console.log("🔁 Updating contact:", idToUse);
-    } else {
-      url = `https://services.leadconnectorhq.com/contacts/`;
-      method = "POST";
-      console.log("🆕 Creating new contact");
-    }
-
-
-/* =========================
-       STEP 3: BUILD BODY
-    ========================= */
-
-    let body;
-
-    if (method === "POST") {
-      // ✅ CREATE (include locationId)
-      body = {
-        locationId: process.env.GHL_LOCATION_ID,
-        firstName,
-        lastName,
-        email: email || undefined,
-        phone: phone || undefined,
-        companyName,
-        customFields: [
-          {
-            id: "ZupChSuIotB55kMGxZiD",
-            field_value: service || ""
-          }
-        ]
-      };
-    } else {
-      // ✅ UPDATE (NO locationId)
-      body = {
-        firstName,
-        lastName,
-        email: email || undefined,
-        phone: phone || undefined,
-        companyName,
-        customFields: [
-          {
-            id: "ZupChSuIotB55kMGxZiD",
-            field_value: service || ""
-          }
-        ]
-      };
-    }
-
-    console.log("📡 METHOD:", method);
-    console.log("📡 BODY:", body);
-
-    /* =========================
-       STEP 4: SEND TO GHL
-    ========================= */
-
-    const response = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${process.env.GHL_API_KEY}`,
-        "Content-Type": "application/json",
-        Version: "2021-07-28"
-      },
-      body: JSON.stringify(body)
+    await updateDemoContact(contactId, {
+      summary,
+      previewUrl
     });
-
-    const data = await response.json();
-
-    console.log("📡 GHL Response:", data);
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: "GHL error",
-        ghl: data
-      });
-    }
-
-    /* =========================
-       STEP 5: EXTRACT CONTACT ID
-    ========================= */
-
-    const finalContactId =
-      data.contact?.id ||
-      data.id ||
-      idToUse;
-
-    if (!finalContactId) {
-      return res.status(500).json({
-        error: "No contactId returned",
-        ghl: data
-      });
-    }
-
-    console.log("✅ Final contactId:", finalContactId);
-
-    /* =========================
-       SUCCESS RESPONSE
-    ========================= */
 
     res.json({
-      success: true,
-      contactId: finalContactId,
-      companyName,
-      phone,
-      email
+      ok: true,
+      contactId,
+      sessionId,
+      previewUrl,
+      summary
     });
-
   } catch (error) {
-    console.error("❌ Server Error:", error);
-
+    console.error("❌ /bootstrap-demo error:", error);
     res.status(500).json({
-      error: "Server crashed",
-      details: error.message
+      ok: false,
+      error: error.message || "Failed to bootstrap demo"
     });
   }
 });
 
-/* =========================
-   START SERVER
-========================= */
+// -----------------------------------
+// GHL HELPERS
+// -----------------------------------
+function ghlHeaders(extra = {}) {
+  const headers = {
+    Authorization: `Bearer ${GHL_API_KEY}`,
+    Version: GHL_VERSION,
+    Accept: "application/json",
+    ...extra
+  };
 
+  // Some accounts/tokens may require location header.
+  if (GHL_LOCATION_ID) {
+    headers["Location-Id"] = GHL_LOCATION_ID;
+  }
+
+  return headers;
+}
+
+function normalizePhoneForCompare(phone) {
+  return (phone || "").replace(/\D/g, "");
+}
+
+async function ghlSearchContacts(query) {
+  const url = `${GHL_API_BASE}/contacts/search?query=${encodeURIComponent(query)}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: ghlHeaders()
+  });
+
+  const data = await safeJson(response);
+
+  if (!response.ok) {
+    console.error("GHL search failed:", data);
+    throw new Error(`GHL search failed with status ${response.status}`);
+  }
+
+  return data;
+}
+
+async function findContactByPhone(phone) {
+  const data = await ghlSearchContacts(phone);
+  const target = normalizePhoneForCompare(phone);
+
+  const contact = (data.contacts || []).find((c) => {
+    const cPhone = normalizePhoneForCompare(c.phone || "");
+    return cPhone && (cPhone === target || cPhone.endsWith(target.slice(-10)));
+  });
+
+  return contact ? contact.id : null;
+}
+
+async function findContactByEmail(email) {
+  const data = await ghlSearchContacts(email);
+  const target = (email || "").trim().toLowerCase();
+
+  const contact = (data.contacts || []).find((c) => {
+    const cEmail = (c.email || "").trim().toLowerCase();
+    return cEmail && cEmail === target;
+  });
+
+  return contact ? contact.id : null;
+}
+
+async function findContactBySessionId(sessionId) {
+  const data = await ghlSearchContacts(sessionId);
+
+  const contact = (data.contacts || []).find((c) => {
+    const customFields = c.customFields || c.custom_fields || [];
+    return customFields.some((field) => {
+      const fieldValue = field.value ?? field.field_value ?? "";
+      const fieldKey = field.key ?? field.name ?? "";
+      return fieldValue === sessionId || fieldKey === "sr_session_id";
+    }) && customFields.some((field) => {
+      const fieldValue = field.value ?? field.field_value ?? "";
+      return fieldValue === sessionId;
+    });
+  });
+
+  return contact ? contact.id : null;
+}
+
+async function createDemoContact({
+  firstName,
+  email,
+  phone,
+  company,
+  service,
+  website,
+  city,
+  sessionId
+}) {
+  const payload = {
+    firstName: firstName || "Guest",
+    lastName: "Visitor",
+    ...(phone ? { phone } : {}),
+    ...(email ? { email } : {}),
+    ...(company ? { companyName: company } : {}),
+    customFields: [
+      { key: "sr_session_id", field_value: sessionId || "" },
+      { key: "sr_company", field_value: company || "" },
+      { key: "sr_service", field_value: service || "" },
+      { key: "sr_website", field_value: website || "" },
+      { key: "sr_city", field_value: city || "" }
+    ]
+  };
+
+  const response = await fetch(`${GHL_API_BASE}/contacts/`, {
+    method: "POST",
+    headers: ghlHeaders({
+      "Content-Type": "application/json"
+    }),
+    body: JSON.stringify(payload)
+  });
+
+  const data = await safeJson(response);
+
+  if (!response.ok) {
+    console.error("Create contact failed:", data);
+    throw new Error(`Failed to create contact: ${response.status}`);
+  }
+
+  const contactId = data.contact?.id || data.id;
+  if (!contactId) {
+    throw new Error("Create contact succeeded but no contact id returned.");
+  }
+
+  return contactId;
+}
+
+async function updateDemoContact(contactId, fields) {
+  const customFields = [];
+
+  if (fields.sessionId) {
+    customFields.push({ key: "sr_session_id", field_value: fields.sessionId });
+  }
+  if (fields.company) {
+    customFields.push({ key: "sr_company", field_value: fields.company });
+  }
+  if (fields.service) {
+    customFields.push({ key: "sr_service", field_value: fields.service });
+  }
+  if (fields.website) {
+    customFields.push({ key: "sr_website", field_value: fields.website });
+  }
+  if (fields.city) {
+    customFields.push({ key: "sr_city", field_value: fields.city });
+  }
+  if (fields.summary) {
+    customFields.push({ key: "sr_demo_summary", field_value: fields.summary });
+  }
+  if (fields.previewUrl) {
+    customFields.push({ key: "sr_preview_url", field_value: fields.previewUrl });
+  }
+
+  const payload = {
+    ...(fields.firstName ? { firstName: fields.firstName } : {}),
+    ...(fields.email ? { email: fields.email } : {}),
+    ...(fields.phone ? { phone: fields.phone } : {}),
+    ...(fields.company ? { companyName: fields.company } : {}),
+    ...(customFields.length ? { customFields } : {})
+  };
+
+  const response = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
+    method: "PUT",
+    headers: ghlHeaders({
+      "Content-Type": "application/json"
+    }),
+    body: JSON.stringify(payload)
+  });
+
+  const data = await safeJson(response);
+
+  if (!response.ok) {
+    console.error("Update contact failed:", data);
+    throw new Error(`Failed to update contact ${contactId}: ${response.status}`);
+  }
+
+  return data;
+}
+
+// -----------------------------------
+// DEMO HELPERS
+// -----------------------------------
+function buildPreviewUrl(website) {
+  if (!website) return "";
+
+  const target = website.startsWith("http://") || website.startsWith("https://")
+    ? website
+    : `https://${website}`;
+
+  return `https://api.microlink.io/?url=${encodeURIComponent(target)}&screenshot=true&fullPage=true&viewport.width=390&viewport.height=844&viewport.deviceScaleFactor=1&meta=false&embed=screenshot.url&isMobile=true`;
+}
+
+function buildDemoSummary({ company, service, website, city }) {
+  const parts = [];
+
+  if (company) parts.push(`Business name: ${company}.`);
+  if (service) parts.push(`Primary service: ${service}.`);
+  if (website) parts.push(`Website: ${website}.`);
+  if (city) parts.push(`Likely city or service area: ${city}.`);
+
+  parts.push("This is a live demo lead.");
+  parts.push("Speak naturally, warmly, and confidently.");
+  parts.push("Reference the business name and service when helpful.");
+  parts.push("Do not invent website details that were not explicitly provided.");
+
+  return parts.join(" ");
+}
+
+async function safeJson(response) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { raw: text };
+  }
+}
+
+// -----------------------------------
+// START SERVER
+// -----------------------------------
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`✅ Server listening on port ${PORT}`);
 });
