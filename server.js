@@ -19,8 +19,6 @@ console.log("API KEY LOADED:", process.env.GHL_API_KEY ? "YES" : "NO");
 // Optional (very helpful)
 console.log("API KEY LENGTH:", process.env.GHL_API_KEY?.length);
 
-console.log("LOCATION ID:", GHL_LOCATION_ID);
-
 const PORT = process.env.PORT || 3000;
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
@@ -32,6 +30,8 @@ const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || "";
 if (!GHL_API_KEY) {
   console.warn("⚠️ Missing GHL_API_KEY in environment variables.");
 }
+
+console.log("LOCATION ID:", GHL_LOCATION_ID);
 
 // -----------------------------------
 // BASIC ROUTE
