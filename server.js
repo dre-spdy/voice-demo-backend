@@ -12,6 +12,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
 // ✅ ADD IT RIGHT HERE
 console.log("API KEY LOADED:", process.env.GHL_API_KEY ? "YES" : "NO");
 
