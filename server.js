@@ -12,6 +12,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ✅ ADD IT RIGHT HERE
+console.log("API KEY LOADED:", process.env.GHL_API_KEY ? "YES" : "NO");
+
+// Optional (very helpful)
+console.log("API KEY LENGTH:", process.env.GHL_API_KEY?.length);
+
 const PORT = process.env.PORT || 3000;
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
