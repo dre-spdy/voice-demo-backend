@@ -119,19 +119,19 @@ function ghlHeaders(extra = {}) {
 async function createContact(data) {
 
   const payload = {
-    firstName: data.firstName || "Guest",
-    lastName: "Visitor",
-    phone: data.phone,
-    email: data.email,
-    companyName: data.company,
-    customFields: [
-      { key: "sr_session_id", field_value: data.sessionId },
-      { key: "sr_company", field_value: data.company },
-      { key: "sr_service", field_value: data.service },
-      { key: "sr_website", field_value: data.website },
-      { key: "sr_city", field_value: data.city }
-    ]
-  };
+  firstName: data.firstName || "Guest",
+  lastName: data.lastName || "Visitor",
+  phone: data.phone,
+  email: data.email,
+  companyName: data.company, // maps to contact.company_name
+
+  customFields: [
+    	{ key: "business_service", field_value: data.service },
+    	{ key: "business_url", field_value: data.website },
+    	{ key: "city", field_value: data.city }, // only if custom
+    	{ key: "sr_session_id", field_value: data.sessionId }
+  	]
+	};
 
   const res = await fetch(`${GHL_API_BASE}/contacts/`, {
     method: "POST",
@@ -156,13 +156,23 @@ async function updateContact(contactId, data) {
 
   const customFields = [];
 
-  if (data.sessionId) customFields.push({ key: "sr_session_id", field_value: data.sessionId });
-  if (data.company) customFields.push({ key: "sr_company", field_value: data.company });
-  if (data.service) customFields.push({ key: "sr_service", field_value: data.service });
-  if (data.website) customFields.push({ key: "sr_website", field_value: data.website });
-  if (data.city) customFields.push({ key: "sr_city", field_value: data.city });
-  if (data.summary) customFields.push({ key: "sr_demo_summary", field_value: data.summary });
-  if (data.previewUrl) customFields.push({ key: "sr_preview_url", field_value: data.previewUrl });
+  if (data.service)
+  customFields.push({ key: "business_service", field_value: data.service });
+
+  if (data.website)
+  customFields.push({ key: "business_url", field_value: data.website });
+
+  if (data.city)
+  customFields.push({ key: "city", field_value: data.city });
+
+  if (data.sessionId)
+  customFields.push({ key: "sr_session_id", field_value: data.sessionId });
+
+  if (data.summary)
+  customFields.push({ key: "sr_demo_summary", field_value: data.summary });
+
+  if (data.previewUrl)
+  customFields.push({ key: "sr_preview_url", field_value: data.previewUrl });
 
   const payload = {
     firstName: data.firstName,
