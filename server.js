@@ -133,11 +133,6 @@ app.post("/bootstrap-demo", async (req, res) => {
 // GHL HELPERS
 // -----------------------------------
 function ghlHeaders(extra = {}) {
-
-  if (!GHL_API_KEY) {
-    throw new Error("❌ Missing GHL_API_KEY");
-  }
-
   return {
     Authorization: `Bearer ${GHL_API_KEY}`,
     Version: "2021-07-28",
