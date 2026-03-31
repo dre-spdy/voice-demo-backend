@@ -3,6 +3,8 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+console.log("OPENAI KEY:", process.env.OPENAI_API_KEY ? "LOADED" : "MISSING");
+
 const app = express();
 
 app.use(cors());
@@ -16,6 +18,14 @@ const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
 
 console.log("API KEY LOADED:", GHL_API_KEY ? "YES" : "NO");
+
+const puppeteer = require("puppeteer");
+const crypto = require("crypto");
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 // ===============================
 // BASIC ROUTE
@@ -237,13 +247,7 @@ app.listen(PORT, () => {
 //    ADDED BELOW FOR DEMO LINK & WEBSITE SCRAPER
 // ===============================================
 
-const puppeteer = require("puppeteer");
-const crypto = require("crypto");
-const OpenAI = require("openai");
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 // ===============================
 // CREATE DEMO LINK (NEW)
