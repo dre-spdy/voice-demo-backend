@@ -9,6 +9,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "openai": "^6.33.0",
+    "puppeteer": "^24.40.0"
   }
 }
