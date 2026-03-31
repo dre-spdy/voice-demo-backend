@@ -274,9 +274,13 @@ app.post("/create-demo", async (req, res) => {
     // ===============================
     // 1. SCRAPE WEBSITE (PUPPETEER)
     // ===============================
+    
+    const puppeteer = require("puppeteer");
+
     const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+       headless: true,
+       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
