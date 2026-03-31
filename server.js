@@ -253,6 +253,8 @@ app.listen(PORT, () => {
 // CREATE DEMO LINK (NEW)
 // ===============================
 app.post("/create-demo", async (req, res) => {
+  
+  const startTime = Date.now(); // ⏱️ start timer
   try {
     const {
       contact_id,
@@ -278,6 +280,7 @@ app.post("/create-demo", async (req, res) => {
     // ===============================
     // 1. SCRAPE WEBSITE (PUPPETEER)
     // ===============================
+    console.log("🌐 Scraping website...");
     
     const puppeteer = require("puppeteer");
 
@@ -313,6 +316,9 @@ app.post("/create-demo", async (req, res) => {
     // ===============================
     // 2. AI SUMMARY
     // ===============================
+
+    console.log("🧠 Generating AI summary...");
+
     let summary = "Website scanned. AI will respond naturally.";
 
     try {
@@ -344,6 +350,8 @@ Keep it short and conversational.
     // ===============================
     // 3. TOKEN
     // ===============================
+    console.log("🔑 Creating token...");
+    
     const token = crypto.randomUUID();
 
     // ===============================
@@ -354,6 +362,9 @@ Keep it short and conversational.
     // ===============================
     // 5. SAVE TO GHL (REUSE YOUR FUNCTION)
     // ===============================
+    
+    console.log("💾 Saving to GHL...");
+
     await updateContact(contact_id, {
       summary, // (optional reuse)
       previewUrl: demoUrl // (optional reuse)
@@ -370,6 +381,15 @@ Keep it short and conversational.
       ]
     });
 
+    const duration = Date.now() - startTime;
+
+    console.log("✅ DEMO CREATED:", {
+      company: company_name,
+      contact_id,
+      demoUrl,
+      duration_ms: duration
+    });
+
     res.json({
       ok: true,
       token,
@@ -377,7 +397,14 @@ Keep it short and conversational.
     });
 
   } catch (err) {
-    console.error("❌ CREATE DEMO ERROR:", err);
+      const duration = Date.now() - startTime;
+
+      console.error("❌ DEMO FAILED:", {
+        company: company_name,
+        contact_id,
+        error: err.message,
+        duration_ms: duration
+      });
     res.status(500).json({ ok: false, error: err.message });
   }
 });
