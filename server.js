@@ -357,7 +357,7 @@ Keep it short and conversational.
     // ===============================
     // 4. DEMO URL
     // ===============================
-    const demoUrl = `${process.env.BASE_DEMO_URL}?token=${token}`;
+    const demoUrl = `${process.env.BASE_DEMO_URL}?t=${token}`;
 
     // ===============================
     // 5. SAVE TO GHL (REUSE YOUR FUNCTION)
