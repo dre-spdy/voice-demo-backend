@@ -181,7 +181,7 @@ async function updateContact(contactId, data) {
   customFields.push({ key: "sr_preview_url", field_value: data.previewUrl });
 
   const payload = {
-  	locationId: process.env.GHL_LOCATION_ID, // 🔥 REQUIRED
+  	//locationId: process.env.GHL_LOCATION_ID, // 🔥 REQUIRED
 
   	firstName: data.firstName,
   	email: data.email,
