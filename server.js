@@ -136,10 +136,10 @@ async function createContact(data) {
   phone: data.phone,
   email: data.email,
   companyName: data.company,
+  Website: data.website,
 
   customFields: [
     	{ key: "business_service", field_value: data.service },
-    	{ key: "business_url", field_value: data.website },
     	{ key: "sr_session_id", field_value: data.sessionId }
   	]
   };
@@ -175,8 +175,8 @@ async function updateContact(contactId, data) {
   if (data.service)
   customFields.push({ key: "business_service", field_value: data.service });
 
-  if (data.website)
-  customFields.push({ key: "business_url", field_value: data.website });
+  //if (data.website)
+  //customFields.push({ key: "business_url", field_value: data.website });
 
   if (data.city)
   customFields.push({ key: "city", field_value: data.city });
@@ -197,6 +197,7 @@ async function updateContact(contactId, data) {
   	email: data.email,
   	phone: data.phone,
   	companyName: data.company,
+        website: data.website,
   	customFields
   };
 
@@ -406,5 +407,78 @@ Keep it short and conversational.
         duration_ms: duration
       });
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ===============================
+// GET DEMO DATA FROM TOKEN
+// ===============================
+app.get("/demo-data", async (req, res) => {
+  try {
+    const token = req.query.t;
+
+    if (!token) {
+      return res.status(400).json({ ok: false, error: "Missing token" });
+    }
+
+    console.log("🔍 Looking up token:", token);
+
+    // 🔥 SEARCH CONTACT BY TOKEN
+    const searchRes = await fetch(
+      `${GHL_API_BASE}/contacts/search`,
+      {
+        method: "POST",
+        headers: ghlHeaders({
+          "Location-Id": process.env.GHL_LOCATION_ID
+        }),
+        body: JSON.stringify({
+          query: token,
+          limit: 1
+        })
+      }
+    );
+
+    const searchJson = await searchRes.json();
+
+    if (!searchRes.ok || !searchJson.contacts?.length) {
+      return res.status(404).json({
+        ok: false,
+        error: "Contact not found"
+      });
+    }
+
+    const contact = searchJson.contacts[0];
+
+    // 🔥 EXTRACT CUSTOM FIELDS
+    const getField = (key) => {
+      const field = contact.customFields?.find(f => f.key === key);
+      return field ? field.field_value : null;
+    };
+
+    const data = {
+      contact_id: contact.id,
+      first_name: contact.firstName,
+      last_name: contact.lastName,
+      email: contact.email,
+      phone: contact.phone,
+      company_name: contact.companyName,
+      website: contact.website,
+      summary: getField("sr_website_summary"),
+      demo_url: getField("sr_demo_url")
+    };
+
+    console.log("✅ Token resolved:", data.company_name);
+
+    res.json({
+      ok: true,
+      data
+    });
+
+  } catch (err) {
+    console.error("❌ DEMO DATA ERROR:", err);
+    res.status(500).json({
+      ok: false,
+      error: err.message
+    });
   }
 });
