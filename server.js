@@ -338,8 +338,8 @@ Keep it short and conversational.
 
       summary = completion.choices[0].message.content;
     } catch (err) {
-      console.log("⚠️ AI summary failed");
-    }
+          console.log("⚠️ AI summary failed:", err.message, err.stack);
+      }
 
     // ===============================
     // 3. TOKEN
