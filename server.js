@@ -428,6 +428,7 @@ app.get("/demo-data", async (req, res) => {
 
     console.log("🔍 Fetching contact:", contactId);
     console.log("🔑 Validating token:", token);
+    console.log("🔍 Token match result:", storedToken === token);
 
     // 🔥 GET CONTACT DIRECTLY (NO SEARCH)
     const response = await fetch(
@@ -460,8 +461,11 @@ app.get("/demo-data", async (req, res) => {
 
     const storedToken = getField("sr_demo_token");
 
+    console.log("🔍 Stored token:", storedToken);
+    console.log("🔍 Incoming token:", token);
+
     // 🔥 VALIDATE TOKEN MATCHES CONTACT
-    if (storedToken !== token) {
+    if (!storedToken || storedToken.trim() !== token.trim()) {
       console.warn("❌ Token mismatch:", {
         expected: storedToken,
         received: token
@@ -490,6 +494,7 @@ app.get("/demo-data", async (req, res) => {
     };
 
     console.log("✅ Demo data ready:", contact.companyName);
+    console.log("Website = ", contact.website);
 
     res.json({
       ok: true,
