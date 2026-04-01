@@ -455,8 +455,8 @@ app.get("/demo-data", async (req, res) => {
 
     // 🔥 HELPER TO GET CUSTOM FIELD
     const getField = (key) => {
-      const field = contact.customFields?.find(f => f.key === key);
-      return field ? field.field_value : null;
+        const field = contact.customFields?.find(f => f.key === key);
+        return field ? (field.value || field.field_value) : null;
     };
 
     const storedToken = getField("sr_demo_token");
