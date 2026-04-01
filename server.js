@@ -427,18 +427,24 @@ app.get("/demo-data", async (req, res) => {
 
     // 🔥 SEARCH CONTACT BY TOKEN
     const searchRes = await fetch(
-      `${GHL_API_BASE}/contacts/search`,
-      {
-        method: "POST",
-        headers: ghlHeaders({
-          "Location-Id": process.env.GHL_LOCATION_ID
-        }),
-        body: JSON.stringify({
-          query: token,
-          limit: 1
-        })
-      }
-    );
+  `${GHL_API_BASE}/contacts/search`,
+  {
+    method: "POST",
+    headers: ghlHeaders({
+      "Location-Id": process.env.GHL_LOCATION_ID
+    }),
+    body: JSON.stringify({
+      filters: [
+        {
+          field: "sr_demo_token",
+          operator: "eq",
+          value: token
+        }
+      ],
+      limit: 1
+    })
+  }
+);
 
     const searchJson = await searchRes.json();
 
