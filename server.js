@@ -1,15 +1,15 @@
 
 const express = require("express");
-app.use(cors({
-  origin: ["https://speedireply.co"]
-}));
+const cors = require("cors");
 require("dotenv").config();
 
 console.log("OPENAI KEY:", process.env.OPENAI_API_KEY ? "LOADED" : "MISSING");
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: ["https://speedireply.co"]
+}));
 app.use(express.json());
 
 // ===============================
