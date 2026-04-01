@@ -360,7 +360,7 @@ Keep it short and conversational.
     // ===============================
     // 4. DEMO URL
     // ===============================
-    const demoUrl = `${process.env.BASE_DEMO_URL}?t=${token}`;
+    const demoUrl = `${BASE_DEMO_URL}?t=${token}&c=${contactId}`;
 
     // ===============================
     // 5. SAVE TO GHL (REUSE YOUR FUNCTION)
@@ -413,69 +413,84 @@ Keep it short and conversational.
 });
 
 // ===============================
-// GET DEMO DATA FROM TOKEN
+// GET DEMO DATA (TOKEN + CONTACT ID)
 // ===============================
 app.get("/demo-data", async (req, res) => {
   try {
     const token = req.query.t;
+    const contactId = req.query.c;
 
-    if (!token) {
-      return res.status(400).json({ ok: false, error: "Missing token" });
+    if (!token || !contactId) {
+      return res.status(400).json({
+        ok: false,
+        error: "Missing token or contactId"
+      });
     }
 
-    console.log("🔍 Looking up token:", token);
+    console.log("🔍 Fetching contact:", contactId);
+    console.log("🔑 Validating token:", token);
 
-    // 🔥 SEARCH CONTACT BY TOKEN
-    const searchRes = await fetch(
-  `${GHL_API_BASE}/contacts/search`,
-  {
-    method: "POST",
-    headers: ghlHeaders({
-      "Location-Id": process.env.GHL_LOCATION_ID
-    }),
-    body: JSON.stringify({
-      filters: [
-        {
-          field: "sr_demo_token",
-          operator: "eq",
-          value: token
-        }
-      ],
-      limit: 1
-    })
-  }
-);
+    // 🔥 GET CONTACT DIRECTLY (NO SEARCH)
+    const response = await fetch(
+      `${GHL_API_BASE}/contacts/${contactId}`,
+      {
+        method: "GET",
+        headers: ghlHeaders({
+          "Location-Id": process.env.GHL_LOCATION_ID
+        })
+      }
+    );
 
-    const searchJson = await searchRes.json();
+    const json = await response.json();
 
-    if (!searchRes.ok || !searchJson.contacts?.length) {
+    if (!response.ok) {
+      console.error("❌ Contact fetch failed:", json);
       return res.status(404).json({
         ok: false,
         error: "Contact not found"
       });
     }
 
-    const contact = searchJson.contacts[0];
+    const contact = json.contact;
 
-    // 🔥 EXTRACT CUSTOM FIELDS
+    // 🔥 HELPER TO GET CUSTOM FIELD
     const getField = (key) => {
       const field = contact.customFields?.find(f => f.key === key);
       return field ? field.field_value : null;
     };
 
+    const storedToken = getField("sr_demo_token");
+
+    // 🔥 VALIDATE TOKEN MATCHES CONTACT
+    if (storedToken !== token) {
+      console.warn("❌ Token mismatch:", {
+        expected: storedToken,
+        received: token
+      });
+
+      return res.status(403).json({
+        ok: false,
+        error: "Invalid token"
+      });
+    }
+
+    console.log("✅ Token validated for:", contact.companyName);
+
+    // 🔥 BUILD RESPONSE DATA
     const data = {
       contact_id: contact.id,
       first_name: contact.firstName,
       last_name: contact.lastName,
       email: contact.email,
       phone: contact.phone,
-      company_name: contact.companyName,
       website: contact.website,
+      company_name: contact.companyName,
+      //website: getField("business_url"),
       summary: getField("sr_website_summary"),
       demo_url: getField("sr_demo_url")
     };
 
-    console.log("✅ Token resolved:", data.company_name);
+    console.log("✅ Demo data ready:", contact.companyName);
 
     res.json({
       ok: true,
@@ -484,6 +499,7 @@ app.get("/demo-data", async (req, res) => {
 
   } catch (err) {
     console.error("❌ DEMO DATA ERROR:", err);
+
     res.status(500).json({
       ok: false,
       error: err.message
