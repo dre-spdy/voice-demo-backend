@@ -428,7 +428,7 @@ app.get("/demo-data", async (req, res) => {
 
     console.log("🔍 Fetching contact:", contactId);
     console.log("🔑 Validating token:", token);
-    console.log("🔍 Token match result:", storedToken === token);
+    
 
     // 🔥 GET CONTACT DIRECTLY (NO SEARCH)
     const response = await fetch(
@@ -463,6 +463,7 @@ app.get("/demo-data", async (req, res) => {
 
     console.log("🔍 Stored token:", storedToken);
     console.log("🔍 Incoming token:", token);
+    console.log("🔍 Token match result:", storedToken === token);
 
     // 🔥 VALIDATE TOKEN MATCHES CONTACT
     if (!storedToken || storedToken.trim() !== token.trim()) {
