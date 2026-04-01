@@ -258,6 +258,8 @@ app.listen(PORT, () => {
 app.post("/create-demo", async (req, res) => {
   
   const startTime = Date.now(); // ⏱️ start timer
+  let companySafe = "";
+  let contactIdSafe = "";
   try {
     const {
       contact_id,
@@ -269,6 +271,9 @@ app.post("/create-demo", async (req, res) => {
       website
     } = req.body || {};
 
+    const companySafe = company_name || "Unknown Company";
+    const contactIdSafe = contact_id || "Unknown ID";
+
     if (!contact_id) {
       return res.status(400).json({ ok: false, error: "Missing contact_id" });
     }
@@ -278,7 +283,7 @@ app.post("/create-demo", async (req, res) => {
       site = `https://${site}`;
     }
 
-    console.log("🚀 Creating demo for:", company_name);
+    console.log("🚀 Creating demo for:", companySafe);
 
     // ===============================
     // 1. SCRAPE WEBSITE (PUPPETEER)
@@ -360,7 +365,7 @@ Keep it short and conversational.
     // ===============================
     // 4. DEMO URL
     // ===============================
-    const demoUrl = `${BASE_DEMO_URL}?t=${token}&c=${contactId}`;
+    const demoUrl = `${BASE_DEMO_URL}?t=${token}&c=${contact_id}`;
 
     // ===============================
     // 5. SAVE TO GHL (REUSE YOUR FUNCTION)
@@ -369,25 +374,19 @@ Keep it short and conversational.
     console.log("💾 Saving to GHL...");
 
     await updateContact(contact_id, {
-      summary, // (optional reuse)
-      previewUrl: demoUrl // (optional reuse)
-
-      // 👇 ADD THESE FIELDS NEXT STEP
-    });
-
-    // 🔥 IMPORTANT — ADD NEW CUSTOM FIELDS SUPPORT
-    await updateContact(contact_id, {
-      customFieldsExtra: [
+       summary,
+       previewUrl: demoUrl,
+       customFieldsExtra: [
         { key: "sr_demo_token", field_value: token },
         { key: "sr_website_summary", field_value: summary },
         { key: "sr_demo_url", field_value: demoUrl }
-      ]
-    });
+       ]
+     });
 
     const duration = Date.now() - startTime;
 
     console.log("✅ DEMO CREATED:", {
-      company: company_name,
+      company: companySafe,
       contact_id,
       demoUrl,
       duration_ms: duration
@@ -403,10 +402,10 @@ Keep it short and conversational.
       const duration = Date.now() - startTime;
 
       console.error("❌ DEMO FAILED:", {
-        company: company_name,
-        contact_id,
-        error: err.message,
-        duration_ms: duration
+         company: companySafe,
+         contact_id: contactIdSafe,
+         error: err.message,
+         duration_ms: duration
       });
     res.status(500).json({ ok: false, error: err.message });
   }
