@@ -496,8 +496,8 @@ app.get("/demo-data", async (req, res) => {
       website: contact.website,
       company_name: contact.companyName,
       //website: getField("business_url"),
-      summary: getField("sr_website_summary"),
-      demo_url: getField("sr_demo_url")
+      summary: getFieldById(FIELD_IDS.WEBSITE_SUMMARY),
+      demo_url: getFieldById(FIELD_IDS.DEMO_URL)
     };
 
     console.log("✅ Demo data ready:", contact.companyName);
