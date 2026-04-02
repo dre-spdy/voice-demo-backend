@@ -454,12 +454,18 @@ app.get("/demo-data", async (req, res) => {
     const contact = json.contact;
 
     // 🔥 HELPER TO GET CUSTOM FIELD
-    const getField = (key) => {
-        const field = contact.customFields?.find(f => f.key === key);
-        return field ? (field.value || field.field_value) : null;
+    const FIELD_IDS = {
+         DEMO_TOKEN: "smKTeeLWqyEi9xG6DEeS", // 🔥 your actual sr_demo_token ID
+         WEBSITE_SUMMARY: "8QiNdg40mEbc0h8qhZ7s",  // 🔥 your actual sr_demo_summary ID
+         DEMO_URL: "HkGDkNl78aMTFpmB7t6t"  // 🔥 your actual sr_demo_url ID
+     };
+
+    const getFieldById = (id) => {
+        const field = contact.customFields?.find(f => f.id === id);
+        return field ? field.value : null;
     };
 
-    const storedToken = getField("sr_demo_token");
+    const storedToken = getFieldById(FIELD_IDS.DEMO_TOKEN);
 
     console.log("🔍 Stored token:", storedToken);
     console.log("🔍 Incoming token:", token);
