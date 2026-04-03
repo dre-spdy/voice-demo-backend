@@ -1,15 +1,20 @@
-
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 console.log("OPENAI KEY:", process.env.OPENAI_API_KEY ? "LOADED" : "MISSING");
 
 const app = express();
 
+// 🔥 SERVE FRONTEND FILES FIRST
+app.use(express.static(path.join(__dirname, "public")));
+
+// 🔥 THEN middleware
 app.use(cors({
   origin: ["https://speedireply.co"]
 }));
+
 app.use(express.json());
 
 // ===============================
@@ -698,4 +703,8 @@ app.get("/demo-live", async (req, res) => {
       error: err.message
     });
   }
+});
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
