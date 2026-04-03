@@ -18,10 +18,12 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
+const BROWSERLESS_WSS = `wss://production-sfo.browserless.io?token=${process.env.BROWSERLESS_API_KEY}`;
 
 console.log("API KEY LOADED:", GHL_API_KEY ? "YES" : "NO");
 
 const puppeteer = require("puppeteer");
+const puppeteerCore = require("puppeteer-core");
 const crypto = require("crypto");
 const OpenAI = require("openai");
 
@@ -510,6 +512,186 @@ app.get("/demo-data", async (req, res) => {
 
   } catch (err) {
     console.error("❌ DEMO DATA ERROR:", err);
+
+    res.status(500).json({
+      ok: false,
+      error: err.message
+    });
+  }
+});
+
+
+// ===============================
+// GENERATE LIVE DEMO URL (OPTIMIZED)
+// ===============================
+app.get("/demo-live", async (req, res) => {
+  try {
+    const token = req.query.t;
+    const contactId = req.query.c;
+    let site = req.query.w; // 🔥 website passed from frontend
+
+    if (!token || !contactId) {
+      return res.status(400).json({
+        ok: false,
+        error: "Missing token or contactId"
+      });
+    }
+
+    console.log("🎥 Live demo request:", contactId);
+
+    // ===============================
+    // 🔥 GET CONTACT (ONLY FOR TOKEN VALIDATION)
+    // ===============================
+    const response = await fetch(
+      `${GHL_API_BASE}/contacts/${contactId}`,
+      {
+        method: "GET",
+        headers: ghlHeaders({
+          "Location-Id": process.env.GHL_LOCATION_ID
+        })
+      }
+    );
+
+    const json = await response.json();
+
+    if (!response.ok) {
+      return res.status(404).json({
+        ok: false,
+        error: "Contact not found"
+      });
+    }
+
+    const contact = json.contact;
+
+    // 🔥 FIELD IDS
+    const FIELD_IDS = {
+      DEMO_TOKEN: "smKTeeLWqyEi9xG6DEeS"
+    };
+
+    const getFieldById = (id) => {
+      const field = contact.customFields?.find(f => f.id === id);
+      return field ? field.value : null;
+    };
+
+    const storedToken = getFieldById(FIELD_IDS.DEMO_TOKEN);
+
+    // 🔥 VALIDATE TOKEN
+    if (!storedToken || storedToken.trim() !== token.trim()) {
+      console.warn("❌ Token mismatch");
+      return res.status(403).json({
+        ok: false,
+        error: "Invalid token"
+      });
+    }
+
+    // ===============================
+    // 🔥 USE FRONTEND WEBSITE (FAST)
+    // ===============================
+    if (!site) {
+      console.log("⚠️ No frontend website, falling back to GHL...");
+      site = contact.website;
+    }
+
+    if (!site) {
+      return res.status(400).json({
+        ok: false,
+        error: "No website available"
+      });
+    }
+
+    if (!site.startsWith("http")) {
+      site = `https://${site}`;
+    }
+
+    console.log("🌐 Loading site:", site);
+
+    // ===============================
+    // 🔥 BROWSERLESS START
+    // ===============================
+    const browser = await puppeteerCore.connect({
+      browserWSEndpoint: BROWSERLESS_WSS
+    });
+
+    const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 390,
+      height: 844,
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 2
+    });
+
+    await page.goto(site, {
+      waitUntil: "networkidle2",
+      timeout: 60000
+    });
+
+    await page.waitForSelector("body", { timeout: 10000 });
+
+    // 🔥 Scroll to trigger lazy loading
+    await page.evaluate(async () => {
+      await new Promise(resolve => {
+        let totalHeight = 0;
+        const distance = 200;
+
+        const timer = setInterval(() => {
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+
+          if (totalHeight >= document.body.scrollHeight) {
+            clearInterval(timer);
+            window.scrollTo(0, 0);
+            resolve();
+          }
+        }, 100);
+      });
+    });
+
+    // 🔥 Load images + GIFs
+    await page.evaluate(async () => {
+      const images = Array.from(document.images);
+
+      await Promise.all(
+        images.map(img => {
+          if (img.complete) return Promise.resolve();
+
+          return new Promise(resolve => {
+            img.onload = img.onerror = resolve;
+          });
+        })
+      );
+    });
+
+    // 🔥 Allow animations to start
+    await new Promise(r => setTimeout(r, 4000));
+
+    // 🔥 Fix black screen
+    await page.evaluate(() => {
+      document.body.style.opacity = "0.99";
+      setTimeout(() => {
+        document.body.style.opacity = "1";
+      }, 100);
+    });
+
+    const client = await page.createCDPSession();
+
+    const result = await client.send("Browserless.liveURL", {
+      timeout: 300000,
+      resizable: true
+    });
+
+    const liveURL = result.liveURL;
+
+    console.log("🔥 LiveURL generated");
+
+    res.json({
+      ok: true,
+      liveURL
+    });
+
+  } catch (err) {
+    console.error("❌ LIVE DEMO ERROR:", err);
 
     res.status(500).json({
       ok: false,
