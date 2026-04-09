@@ -439,9 +439,8 @@ Keep it short and conversational.
 app.get("/demo-data", async (req, res) => {
   try {
     const token = req.query.token || req.query.t;
-    const contactId = req.query.c;
 
-    if (!token || !contactId) {
+    if (!token) {
       return res.status(400).json({
         ok: false,
         error: "Missing token or contactId"
