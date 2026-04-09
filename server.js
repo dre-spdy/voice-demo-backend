@@ -438,7 +438,7 @@ Keep it short and conversational.
 // ===============================
 app.get("/demo-data", async (req, res) => {
   try {
-    const token = req.query.t;
+    const token = req.query.token || req.query.t;
     const contactId = req.query.c;
 
     if (!token || !contactId) {
@@ -448,7 +448,7 @@ app.get("/demo-data", async (req, res) => {
       });
     }
 
-    console.log("🔍 Searching contact by token:", token);
+    console.log("🔍 Searching contact by token received:", token);
 
     const response = await fetch(
       `${GHL_API_BASE}/contacts/search`,
