@@ -246,7 +246,8 @@ Live demo lead. Speak naturally.
 }
 
 // ===============================
-app.listen(PORT, () => {
+
+app.listen(process.env.PORT || 3000, () => {
   console.log(`✅ Server running on ${PORT}`);
 });
 
