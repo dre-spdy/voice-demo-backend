@@ -447,6 +447,12 @@ app.get("/demo-data", async (req, res) => {
         error: "Missing token or contactId"
       });
     }
+    // 🔥 HELPER TO GET CUSTOM FIELD
+    const FIELD_IDS = {
+         DEMO_TOKEN: "smKTeeLWqyEi9xG6DEeS", // 🔥 your actual sr_demo_token ID
+         WEBSITE_SUMMARY: "8QiNdg40mEbc0h8qhZ7s",  // 🔥 your actual sr_demo_summary ID
+         DEMO_URL: "HkGDkNl78aMTFpmB7t6t"  // 🔥 your actual sr_demo_url ID
+     };
 
     console.log("🔍 Searching contact by token received:", token);
 
@@ -458,22 +464,16 @@ app.get("/demo-data", async (req, res) => {
           "Location-Id": process.env.GHL_LOCATION_ID
         }),
         body: JSON.stringify({
-          locationId: process.env.GHL_LOCATION_ID, // 🔥 ADD THIS
-          filters: [
-            {
-              field: "customFields.sr_demo_token",
-              operator: "eq",
-              value: token
-            }
-          ]
-          //filters: [
-          //  {
-          //    field: "customFields.smKTeeLWqyEi9xG6DEeS",  // for sr_demo_token field
-          //    operator: "eq",
-          //    value: token
-          //  }
-          //]
-        })
+            locationId: process.env.GHL_LOCATION_ID,
+             pageLimit: 1, // 🔥 ADD THIS
+             filters: [
+               {
+                  field: `customFields.${FIELD_IDS.DEMO_TOKEN}`,
+                  operator: "eq",
+                  value: token.trim()
+               }
+             ]
+         })
       }
     );
 
@@ -490,12 +490,7 @@ app.get("/demo-data", async (req, res) => {
 
     const contact = json.contacts[0];
 
-    // 🔥 HELPER TO GET CUSTOM FIELD
-    const FIELD_IDS = {
-         DEMO_TOKEN: "smKTeeLWqyEi9xG6DEeS", // 🔥 your actual sr_demo_token ID
-         WEBSITE_SUMMARY: "8QiNdg40mEbc0h8qhZ7s",  // 🔥 your actual sr_demo_summary ID
-         DEMO_URL: "HkGDkNl78aMTFpmB7t6t"  // 🔥 your actual sr_demo_url ID
-     };
+    
 
     const getFieldById = (id) => {
         const field = contact.customFields?.find(f => f.id === id);
