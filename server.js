@@ -458,21 +458,21 @@ app.get("/demo-data", async (req, res) => {
           "Location-Id": process.env.GHL_LOCATION_ID
         }),
         body: JSON.stringify({
-          //filters: [
-          //  {
-          //    field: "customFields.sr_demo_token",
-          //    operator: "eq",
-          //    value: token
-          //  }
-          //]
           locationId: process.env.GHL_LOCATION_ID, // 🔥 ADD THIS
           filters: [
             {
-              field: "customFields.smKTeeLWqyEi9xG6DEeS",  // for sr_demo_token field
+              field: "customFields.sr_demo_token",
               operator: "eq",
               value: token
             }
           ]
+          //filters: [
+          //  {
+          //    field: "customFields.smKTeeLWqyEi9xG6DEeS",  // for sr_demo_token field
+          //    operator: "eq",
+          //    value: token
+          //  }
+          //]
         })
       }
     );
