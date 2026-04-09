@@ -464,15 +464,16 @@ app.get("/demo-data", async (req, res) => {
           "Location-Id": process.env.GHL_LOCATION_ID
         }),
         body: JSON.stringify({
-            locationId: process.env.GHL_LOCATION_ID,
-             pageLimit: 1, // 🔥 ADD THIS
-             filters: [
-               {
-                  field: `customFields.${FIELD_IDS.DEMO_TOKEN}`,
-                  operator: "eq",
-                  value: token.trim()
-               }
-             ]
+          locationId: process.env.GHL_LOCATION_ID,
+          page: 1,
+          pageLimit: 1,
+          filters: [
+            {
+              field: `customFields.${FIELD_IDS.DEMO_TOKEN}`,
+              operator: "eq",
+              value: token.trim()
+            }
+           ]
          })
       }
     );
