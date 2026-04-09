@@ -539,6 +539,8 @@ app.get("/demo-data", async (req, res) => {
     });
 
     // 🔥 BUILD RESPONSE DATA
+    const demoUrl = getFieldById(FIELD_IDS.DEMO_URL);
+
     const data = {
       contact_id: contact.id,
       first_name: contact.firstName,
@@ -547,13 +549,13 @@ app.get("/demo-data", async (req, res) => {
       phone: contact.phone,
       website: contact.website,
       company_name: contact.companyName,
-      //website: getField("business_url"),
       summary: getFieldById(FIELD_IDS.WEBSITE_SUMMARY),
-      demo_url: getFieldById(FIELD_IDS.DEMO_URL)
+      demo_url: demoUrl
     };
 
     console.log("✅ Demo data ready:", contact.companyName);
-    console.log("Website = ", contact.website);
+    console.log("🌐 Website:", contact.website);
+    console.log("🌍 Demo URL:", demoUrl);
 
     res.json({
       ok: true,
