@@ -465,9 +465,10 @@ app.get("/demo-data", async (req, res) => {
           //    value: token
           //  }
           //]
+          locationId: process.env.GHL_LOCATION_ID, // 🔥 ADD THIS
           filters: [
             {
-              field: "customFields.smKTeeLWqyEi9xG6DEeS",
+              field: "customFields.smKTeeLWqyEi9xG6DEeS",  // for sr_demo_token field
               operator: "eq",
               value: token
             }
