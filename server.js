@@ -360,17 +360,34 @@ Keep it short and conversational.
           console.log("⚠️ AI summary failed:", err.message, err.stack);
       }
 
+
     // ===============================
     // 3. TOKEN
     // ===============================
     console.log("🔑 Creating token...");
-    
-    const token = crypto.randomUUID();
 
+    const { nanoid } = require("nanoid");
+
+    let token;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+
+    do {
+      token = nanoid(8);
+      attempts++;
+    } while ((!token || token.length < 6) && attempts < MAX_ATTEMPTS);
+
+    if (!token || token.length < 6) {
+      throw new Error("Failed to generate valid token after retries");
+    }
+
+    console.log("🔑 Token created:", token);
+	
+	
     // ===============================
     // 4. DEMO URL
     // ===============================
-    const demoUrl = `${process.env.BASE_DEMO_URL}?t=${token}&c=${contact_id}`;
+    const demoUrl = `${process.env.BASE_DEMO_URL}/demo/${token}`;
 
     // ===============================
     // 5. SAVE TO GHL (REUSE YOUR FUNCTION)
@@ -431,32 +448,46 @@ app.get("/demo-data", async (req, res) => {
       });
     }
 
-    console.log("🔍 Fetching contact:", contactId);
-    console.log("🔑 Validating token:", token);
-    
+    console.log("🔍 Searching contact by token:", token);
 
-    // 🔥 GET CONTACT DIRECTLY (NO SEARCH)
     const response = await fetch(
-      `${GHL_API_BASE}/contacts/${contactId}`,
+      `${GHL_API_BASE}/contacts/search`,
       {
-        method: "GET",
+        method: "POST",
         headers: ghlHeaders({
           "Location-Id": process.env.GHL_LOCATION_ID
+        }),
+        body: JSON.stringify({
+          //filters: [
+          //  {
+          //    field: "customFields.sr_demo_token",
+          //    operator: "eq",
+          //    value: token
+          //  }
+          //]
+          filters: [
+            {
+              field: "customFields.smKTeeLWqyEi9xG6DEeS",
+              operator: "eq",
+              value: token
+            }
+          ]
         })
       }
     );
 
     const json = await response.json();
 
-    if (!response.ok) {
-      console.error("❌ Contact fetch failed:", json);
+    if (!response.ok || !json.contacts || json.contacts.length === 0) {
+      console.error("❌ Contact not found:", json);
+
       return res.status(404).json({
         ok: false,
-        error: "Contact not found"
+        error: "Demo not found"
       });
     }
 
-    const contact = json.contact;
+    const contact = json.contacts[0];
 
     // 🔥 HELPER TO GET CUSTOM FIELD
     const FIELD_IDS = {
@@ -490,6 +521,22 @@ app.get("/demo-data", async (req, res) => {
     }
 
     console.log("✅ Token validated for:", contact.companyName);
+
+    //******************************* 
+    //    TRACKING OPEN DATE & TIME 
+    //*******************************
+    await fetch(`${GHL_API_BASE}/contacts/${contact.id}`, {
+      method: "PUT",
+      headers: ghlHeaders(),
+      body: JSON.stringify({
+        customFields: [
+          {
+            key: "sr_demo_opened_at",
+            field_value: new Date().toISOString()
+          }
+        ]
+      })
+    });
 
     // 🔥 BUILD RESPONSE DATA
     const data = {
