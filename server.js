@@ -197,6 +197,31 @@ async function updateContact(contactId, data) {
   if (data.previewUrl)
   customFields.push({ key: "sr_preview_url", field_value: data.previewUrl });
 
+  // ===============================
+  // TAG HANDLING
+  // ===============================
+  const tagsToAdd = data.tagsToAdd || [];
+  let updatedTags = [];
+  if (tagsToAdd.length > 0) {
+     try {
+       const contactRes = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
+         method: "GET",
+         headers: ghlHeaders()
+       });
+
+       const contactJson = await contactRes.json();
+       const existingTags = contactJson.contact?.tags || [];
+
+       updatedTags = [...new Set([...existingTags, ...tagsToAdd])];
+
+     } catch (err) {
+       console.error("⚠️ Failed to fetch existing tags:", err.message);
+     }
+   }
+
+  // ===============================
+  // PAYLOAD
+  // ===============================
   const payload = {
   	//locationId: process.env.GHL_LOCATION_ID, // 🔥 REQUIRED
 
@@ -205,7 +230,8 @@ async function updateContact(contactId, data) {
   	phone: data.phone,
   	companyName: data.company,
         website: data.website,
-  	customFields
+  	customFields,
+        ...(updatedTags.length > 0 && { tags: updatedTags }) // ✅ ADD THIS LINE
   };
 
   const res = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
@@ -399,6 +425,7 @@ Keep it short and conversational.
     await updateContact(contact_id, {
        summary,
        previewUrl: demoUrl,
+       tagsToAdd: ["Demo Created"],   // ✅ THIS NOW WORKS
        customFieldsExtra: [
         { key: "sr_demo_token", field_value: token },
         { key: "sr_website_summary", field_value: summary },
