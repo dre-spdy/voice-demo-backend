@@ -549,6 +549,7 @@ app.get("/demo-data", async (req, res) => {
     //******************************* 
     //    TRACKING OPEN DATE & TIME 
     //*******************************
+    /*  TAKE OUT on 4-28-26 to do updateContact & add Tag instead below.....
     await fetch(`${GHL_API_BASE}/contacts/${contact.id}`, {
       method: "PUT",
       headers: ghlHeaders(),
@@ -561,6 +562,19 @@ app.get("/demo-data", async (req, res) => {
         ]
       })
     });
+    */
+    //***** BEGIN OF NEW ADD on 4-28-26 *******
+    await updateContact(contact.id, {
+      customFieldsExtra: [
+       {
+          key: "sr_demo_opened_at",
+          field_value: new Date().toISOString()
+       }
+      ],
+     tagsToAdd: ["demo_page_opened"]
+    });
+    
+    //************** END OF NEW ADD
 
     // 🔥 BUILD RESPONSE DATA
     const demoUrl = getFieldById(FIELD_IDS.DEMO_URL);
@@ -593,6 +607,71 @@ app.get("/demo-data", async (req, res) => {
       ok: false,
       error: err.message
     });
+  }
+});
+
+// ===============================
+// DEMO ENGAGED TRACKING  --- ADDED on 4-28-26
+// ===============================
+app.post("/mark-engaged", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ ok: false, error: "Missing token" });
+    }
+
+    console.log("🔥 Marking demo engaged for token:", token);
+
+    // 🔍 Find contact by token (reuse your logic)
+    const response = await fetch(
+      `${GHL_API_BASE}/contacts/search`,
+      {
+        method: "POST",
+        headers: ghlHeaders({
+          "Location-Id": process.env.GHL_LOCATION_ID
+        }),
+        body: JSON.stringify({
+          locationId: process.env.GHL_LOCATION_ID,
+          page: 1,
+          pageLimit: 1,
+          filters: [
+            {
+              field: "customFields.smKTeeLWqyEi9xG6DEeS", // sr_demo_token ID
+              operator: "eq",
+              value: token.trim()
+            }
+          ]
+        })
+      }
+    );
+
+    const json = await response.json();
+
+    if (!response.ok || !json.contacts || json.contacts.length === 0) {
+      return res.status(404).json({ ok: false, error: "Contact not found" });
+    }
+
+    const contact = json.contacts[0];
+
+    // 🔥 UPDATE CONTACT (ADD TAG + TIMESTAMP)
+    await updateContact(contact.id, {
+      customFieldsExtra: [
+        {
+          key: "sr_demo_engaged_at",
+          field_value: new Date().toISOString()
+        }
+      ],
+      tagsToAdd: ["demo_engaged"]
+    });
+
+    console.log("✅ Demo engaged recorded for:", contact.companyName);
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("❌ ENGAGED ERROR:", err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
