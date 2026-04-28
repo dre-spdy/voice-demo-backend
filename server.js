@@ -549,7 +549,6 @@ app.get("/demo-data", async (req, res) => {
     //******************************* 
     //    TRACKING OPEN DATE & TIME 
     //*******************************
-    /*  TAKE OUT on 4-28-26 to do updateContact & add Tag instead below.....
     await fetch(`${GHL_API_BASE}/contacts/${contact.id}`, {
       method: "PUT",
       headers: ghlHeaders(),
@@ -562,19 +561,7 @@ app.get("/demo-data", async (req, res) => {
         ]
       })
     });
-    */
-    //***** BEGIN OF NEW ADD on 4-28-26 *******
-    await updateContact(contact.id, {
-      customFieldsExtra: [
-       {
-          key: "sr_demo_opened_at",
-          field_value: new Date().toISOString()
-       }
-      ],
-     tagsToAdd: ["demo_page_opened"]
-    });
     
-    //************** END OF NEW ADD
 
     // 🔥 BUILD RESPONSE DATA
     const demoUrl = getFieldById(FIELD_IDS.DEMO_URL);
