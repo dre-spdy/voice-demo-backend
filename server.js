@@ -549,18 +549,25 @@ app.get("/demo-data", async (req, res) => {
     //******************************* 
     //    TRACKING OPEN DATE & TIME 
     //*******************************
-    await fetch(`${GHL_API_BASE}/contacts/${contact.id}`, {
-      method: "PUT",
-      headers: ghlHeaders(),
-      body: JSON.stringify({
-        customFields: [
-          {
-            key: "sr_demo_opened_at",
-            field_value: new Date().toISOString()
-          }
-        ]
-      })
-    });
+    const alreadyOpened = contact.customFields?.find(
+      f => f.key === "sr_demo_opened_at"
+    );
+
+    if (!alreadyOpened?.value) {
+        await fetch(`${GHL_API_BASE}/contacts/${contact.id}`, {
+        method: "PUT",
+        headers: ghlHeaders(),
+        body: JSON.stringify({
+          customFields: [
+            {
+              key: "sr_demo_opened_at",
+              field_value: new Date().toISOString()
+            }
+          ],
+          tags: ["demo_opened"]
+        })
+      });
+    }
     
 
     // 🔥 BUILD RESPONSE DATA
@@ -593,6 +600,57 @@ app.get("/demo-data", async (req, res) => {
     res.status(500).json({
       ok: false,
       error: err.message
+    });
+  }
+});
+
+
+// ===============================
+// FOR TRACKING IF DEMO IS ENGAGED WITH DEMO
+// ===============================
+
+app.post("/demo-engaged", async (req, res) => {
+  try {
+    const { contactId } = req.body;
+
+    if (!contactId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing contactId"
+      });
+    }
+
+    // Update contact in GHL
+    await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+          Version: "2021-07-28",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customFields: [
+            {
+              key: "sr_demo_engaged",
+              field_value: true
+            }
+          ],
+          tags: ["demo_engaged"]
+        })
+      }
+    );
+
+    res.json({
+      success: true
+    });
+
+  } catch (err) {
+    console.error("❌ demo-engaged error", err);
+
+    res.status(500).json({
+      success: false
     });
   }
 });
