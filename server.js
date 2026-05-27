@@ -606,11 +606,12 @@ app.get("/demo-data", async (req, res) => {
 
 
 // ===============================
-// FOR TRACKING IF DEMO IS ENGAGED WITH DEMO
+// FOR TRACKING IF DEMO IS ENGAGED
 // ===============================
 
 app.post("/demo-engaged", async (req, res) => {
   try {
+
     const { contactId } = req.body;
 
     if (!contactId) {
@@ -620,7 +621,47 @@ app.post("/demo-engaged", async (req, res) => {
       });
     }
 
-    // Update contact in GHL
+    // ===============================
+    // GET CURRENT CONTACT
+    // ===============================
+
+    const contactRes = await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${process.env.GHL_API_KEY}`,
+          Version: "2021-07-28",
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const contactData = await contactRes.json();
+
+    // ===============================
+    // FIND CURRENT COUNT
+    // ===============================
+
+    let currentCount = 0;
+
+    const engagedField = contactData.contact.customFields.find(
+      f => f.id === "sr_demo_engaged_count"
+      || f.key === "sr_demo_engaged_count"
+    );
+
+    if (engagedField && engagedField.value) {
+      currentCount = parseInt(engagedField.value) || 0;
+    }
+
+    const newCount = currentCount + 1;
+
+    console.log("🔥 Demo engaged count:", newCount);
+
+    // ===============================
+    // UPDATE CONTACT
+    // ===============================
+
     await fetch(
       `https://services.leadconnectorhq.com/contacts/${contactId}`,
       {
@@ -635,6 +676,10 @@ app.post("/demo-engaged", async (req, res) => {
             {
               key: "sr_demo_engaged",
               field_value: true
+            },
+            {
+              key: "sr_demo_engaged_count",
+              field_value: newCount
             }
           ],
           tags: ["demo_engaged"]
@@ -643,17 +688,17 @@ app.post("/demo-engaged", async (req, res) => {
     );
 
     res.json({
-      success: true
+      success: true,
+      engagedCount: newCount
     });
 
   } catch (err) {
+
     console.error("❌ demo-engaged error", err);
 
     res.status(500).json({
       success: false
     });
+
   }
 });
-
-
-
