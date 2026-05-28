@@ -518,6 +518,10 @@ app.get("/demo-data", async (req, res) => {
 
     const contact = json.contacts[0];
 
+    console.log(
+      "🔥 ALL CUSTOM FIELDS:",
+        JSON.stringify(contact.customFields, null, 2)
+    );
     
 
     const getFieldById = (id) => {
@@ -717,39 +721,3 @@ app.post("/demo-engaged", async (req, res) => {
   }
 });
 
-app.get("/get-custom-fields", async (req, res) => {
-
-  try {
-
-    const response = await fetch(
-      `https://services.leadconnectorhq.com/locations/${process.env.LOCATION_ID}/customFields?model=contact`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${process.env.GHL_API_KEY}`,
-          Version: "2021-07-28",
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    const data = await response.json();
-
-    console.log(
-      "🔥 CUSTOM FIELDS:",
-      JSON.stringify(data, null, 2)
-    );
-
-    res.json(data);
-
-  } catch (err) {
-
-    console.error(err);
-
-    res.status(500).json({
-      success: false
-    });
-
-  }
-
-});
