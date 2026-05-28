@@ -654,6 +654,8 @@ app.post("/demo-engaged", async (req, res) => {
       currentCount = parseInt(engagedField.value) || 0;
     }
 
+    console.log("🔥 Demo currentCount:", currentCount);
+    
     const newCount = currentCount + 1;
 
     console.log("🔥 Demo engaged count:", newCount);
