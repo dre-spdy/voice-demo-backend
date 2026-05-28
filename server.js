@@ -639,41 +639,37 @@ app.post("/demo-engaged", async (req, res) => {
 
     const contactData = await contactRes.json();
 
+   // ===============================
+    // FIND CURRENT COUNT
     // ===============================
-// FIND CURRENT COUNT
-// ===============================
-
+    
     let currentCount = 0;
-
+    
     const customFields =
       contactData.contact.customFields || [];
-  
+    
     console.log(
       "🔥 customFields:",
       JSON.stringify(customFields, null, 2)
     );
-  
+    
     const engagedField = customFields.find(
-      f =>
-        f.key === "sr_demo_engaged_count" ||
-        f.id === "sr_demo_engaged_count"
+      f => f.id === "Z0hcbgKIso3SfrxlueOO"
     );
-  
+    
     console.log("🔥 engagedField:", engagedField);
-  
+    
     if (engagedField) {
-  
+    
       currentCount = parseInt(
-        engagedField.field_value ||
-        engagedField.value ||
-        0
+        engagedField.value || 0
       ) || 0;
     }
-  
+    
     console.log("🔥 Demo currentCount:", currentCount);
-  
-    const newCount = currentCount + 1;  
-
+    
+    const newCount = currentCount + 1;
+    
     console.log("🔥 Demo engaged count:", newCount);
 
     // ===============================
