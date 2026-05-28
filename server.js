@@ -478,7 +478,8 @@ app.get("/demo-data", async (req, res) => {
     const FIELD_IDS = {
          DEMO_TOKEN: "smKTeeLWqyEi9xG6DEeS", // 🔥 your actual sr_demo_token ID
          WEBSITE_SUMMARY: "8QiNdg40mEbc0h8qhZ7s",  // 🔥 your actual sr_demo_summary ID
-         DEMO_URL: "HkGDkNl78aMTFpmB7t6t"  // 🔥 your actual sr_demo_url ID
+         DEMO_URL: "HkGDkNl78aMTFpmB7t6t",  // 🔥 your actual sr_demo_url ID
+         DEMO_AGENT_TYPE: "u6PUIjkcnObn73tWNyWR"   // actual sr_demo_agent_type
      };
 
     console.log("🔍 Searching contact by token received:", token);
@@ -518,10 +519,12 @@ app.get("/demo-data", async (req, res) => {
 
     const contact = json.contacts[0];
 
+    /***** USED TO GET THE CUSTOM FIELD ID ******
     console.log(
       "🔥 ALL CUSTOM FIELDS:",
         JSON.stringify(contact.customFields, null, 2)
     );
+    ************** */
     
 
     const getFieldById = (id) => {
@@ -586,12 +589,17 @@ app.get("/demo-data", async (req, res) => {
       website: contact.website,
       company_name: contact.companyName,
       summary: getFieldById(FIELD_IDS.WEBSITE_SUMMARY),
-      demo_url: demoUrl
+      demo_url: demoUrl,
+      agent_type: getFieldById(FIELD_IDS.DEMO_AGENT_TYPE)
     };
 
     console.log("✅ Demo data ready:", contact.companyName);
     console.log("🌐 Website:", contact.website);
     console.log("🌍 Demo URL:", demoUrl);
+    console.log(
+        "🔥 Agent Type:",
+        getFieldById(FIELD_IDS.DEMO_AGENT_TYPE)
+    );
 
     res.json({
       ok: true,
