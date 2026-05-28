@@ -648,16 +648,16 @@ app.post("/demo-engaged", async (req, res) => {
     const customFields =
       contactData.contact.customFields || [];
     
-    console.log(
-      "🔥 customFields:",
+    /*console.log(
+    //  "🔥 customFields:",
       JSON.stringify(customFields, null, 2)
-    );
+    ); */
     
     const engagedField = customFields.find(
       f => f.id === "Z0hcbgKIso3SfrxlueOO"
     );
     
-    console.log("🔥 engagedField:", engagedField);
+    //console.log("🔥 engagedField:", engagedField);
     
     if (engagedField) {
     
@@ -666,11 +666,11 @@ app.post("/demo-engaged", async (req, res) => {
       ) || 0;
     }
     
-    console.log("🔥 Demo currentCount:", currentCount);
+    //console.log("🔥 Demo currentCount:", currentCount);
     
     const newCount = currentCount + 1;
     
-    console.log("🔥 Demo engaged count:", newCount);
+    //console.log("🔥 Demo engaged count:", newCount);
 
     // ===============================
     // UPDATE CONTACT
