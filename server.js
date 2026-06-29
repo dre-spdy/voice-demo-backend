@@ -303,8 +303,11 @@ app.post("/create-demo", async (req, res) => {
       website
     } = req.body || {};
 
-    const companySafe = company_name || "Unknown Company";
-    const contactIdSafe = contact_id || "Unknown ID";
+    /*const companySafe = company_name || "Unknown Company";
+    const contactIdSafe = contact_id || "Unknown ID"; */
+    
+    companySafe = company_name || "Unknown Company";
+    contactIdSafe = contact_id || "Unknown ID";
 
     if (!contact_id) {
       return res.status(400).json({ ok: false, error: "Missing contact_id" });
@@ -320,14 +323,31 @@ app.post("/create-demo", async (req, res) => {
     // ===============================
     // 1. SCRAPE WEBSITE (PUPPETEER)
     // ===============================
-    console.log("🌐 Scraping website...");
+    console.log("🌐 Scraping website...starting puppeteer");
     
+    
+    /*
     const puppeteer = require("puppeteer");
 
     const browser = await puppeteer.launch({
        headless: true,
        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+    */
+    const puppeteer = require("puppeteer");
+
+    const browser = await puppeteer.launch({
+        headless: "new",
+        executablePath: puppeteer.executablePath(),
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--no-zygote"
+        ],
+        timeout: 60000
     });
 
     const page = await browser.newPage();
