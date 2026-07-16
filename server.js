@@ -35,6 +35,39 @@ const openai = new OpenAI({
 });
 
 // ===============================
+// PUPPETEER CONCURRENCY CONTROL
+// ===============================
+let activePuppeteerJobs = 0;
+const MAX_CONCURRENT_PUPPETEER_JOBS = 1;
+const puppeteerQueue = [];
+
+function acquirePuppeteerSlot() {
+  return new Promise((resolve) => {
+    if (activePuppeteerJobs < MAX_CONCURRENT_PUPPETEER_JOBS) {
+      activePuppeteerJobs++;
+      console.log(`🔒 Puppeteer slot acquired. Active jobs: ${activePuppeteerJobs}`);
+      resolve();
+      return;
+    }
+
+    console.log(`⏳ Puppeteer busy. Request added to queue. Queue length: ${puppeteerQueue.length + 1}`);
+    puppeteerQueue.push(resolve);
+  });
+}
+
+function releasePuppeteerSlot() {
+  activePuppeteerJobs = Math.max(0, activePuppeteerJobs - 1);
+  console.log(`🔓 Puppeteer slot released. Active jobs: ${activePuppeteerJobs}`);
+
+  const nextJob = puppeteerQueue.shift();
+  if (nextJob) {
+    activePuppeteerJobs++;
+    console.log(`▶️ Starting next queued Puppeteer job. Remaining queue: ${puppeteerQueue.length}`);
+    nextJob();
+  }
+}
+
+// ===============================
 // BASIC ROUTE
 // ===============================
 app.get("/", (req, res) => {
@@ -292,6 +325,8 @@ app.post("/create-demo", async (req, res) => {
   const startTime = Date.now(); // ⏱️ start timer
   let companySafe = "";
   let contactIdSafe = "";
+  let puppeteerSlotAcquired = false;
+
   try {
     const {
       contact_id,
@@ -323,55 +358,95 @@ app.post("/create-demo", async (req, res) => {
     // ===============================
     // 1. SCRAPE WEBSITE (PUPPETEER)
     // ===============================
+    console.log("🌐 Waiting for Puppeteer slot...");
+
+    await acquirePuppeteerSlot();
+    puppeteerSlotAcquired = true;
+
     console.log("🌐 Scraping website...starting puppeteer");
-    
-    
-    /*
-    const puppeteer = require("puppeteer");
+    console.log("Puppeteer executable:", puppeteer.executablePath());
 
-    const browser = await puppeteer.launch({
-       headless: true,
-       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-       args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-    */
-    const puppeteer = require("puppeteer");
+    let browser;
+    let text = "";
 
-    const browser = await puppeteer.launch({
-        headless: "new",
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
         executablePath: puppeteer.executablePath(),
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--no-zygote"
+          "--disable-gpu"
         ],
-        timeout: 60000
-    });
-
-    const page = await browser.newPage();
-
-    await page.goto(site, {
-      waitUntil: "networkidle2",
-      timeout: 30000
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    const text = await page.evaluate(() => {
-      const remove = ["script", "style", "noscript"];
-      remove.forEach(tag => {
-        document.querySelectorAll(tag).forEach(el => el.remove());
+        timeout: 60000,
+        dumpio: true
       });
 
-      return document.body.innerText
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 6000);
-    });
+      const page = await browser.newPage();
 
-    await browser.close();
+      await page.setRequestInterception(true);
+
+      page.on("request", request => {
+        const resourceType = request.resourceType();
+
+        if (["image", "media", "font"].includes(resourceType)) {
+          request.abort();
+        } else {
+          request.continue();
+        }
+      });
+
+      page.setDefaultNavigationTimeout(45000);
+
+      const response = await page.goto(site, {
+        waitUntil: "domcontentloaded",
+        timeout: 45000
+      });
+
+      if (!response) {
+        throw new Error(`Website returned no navigation response: ${site}`);
+      }
+
+      console.log("Website response status:", response.status());
+      console.log("Final website URL:", page.url());
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      text = await page.evaluate(() => {
+        const remove = ["script", "style", "noscript", "svg"];
+
+        remove.forEach(tag => {
+          document.querySelectorAll(tag).forEach(el => el.remove());
+        });
+
+        return document.body?.innerText
+          ?.replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 6000) || "";
+      });
+
+      if (!text) {
+        throw new Error(`No readable website text found at ${page.url()}`);
+      }
+
+      console.log(`✅ Website scraped: ${text.length} characters`);
+
+    } finally {
+      if (browser) {
+        try {
+          await browser.close();
+          console.log("✅ Puppeteer browser closed");
+        } catch (browserCloseError) {
+          console.error("⚠️ Failed to close Puppeteer browser:", browserCloseError.message);
+        }
+      }
+
+      if (puppeteerSlotAcquired) {
+        releasePuppeteerSlot();
+        puppeteerSlotAcquired = false;
+      }
+    }
 
     // ===============================
     // 2. AI SUMMARY
@@ -469,15 +544,25 @@ Keep it short and conversational.
     });
 
   } catch (err) {
-      const duration = Date.now() - startTime;
+    const duration = Date.now() - startTime;
 
-      console.error("❌ DEMO FAILED:", {
-         company: companySafe,
-         contact_id: contactIdSafe,
-         error: err.message,
-         duration_ms: duration
-      });
-    res.status(500).json({ ok: false, error: err.message });
+    console.error("❌ DEMO FAILED:", {
+      company: companySafe,
+      contact_id: contactIdSafe,
+      error: err.message,
+      duration_ms: duration
+    });
+
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  } finally {
+    // Safety net in case an error occurs after acquiring the slot
+    // but before the scraper's inner finally releases it.
+    if (puppeteerSlotAcquired) {
+      releasePuppeteerSlot();
+      puppeteerSlotAcquired = false;
+    }
   }
 });
 
